@@ -118,13 +118,9 @@ class SessionManager {
             console.log('Creating peer with ID:', peerId);
 
             // Try to connect to PeerJS cloud server
-            // Note: 0.peerjs.com is the default free cloud service
-            this.peer = new Peer(peerId, {
+            // Try with undefined ID to let PeerJS generate one
+            this.peer = new Peer({
                 debug: 2, // Enable debug logging
-                host: '0.peerjs.com',
-                port: 443,
-                path: '/',
-                secure: true,
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
