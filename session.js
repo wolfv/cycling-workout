@@ -117,8 +117,14 @@ class SessionManager {
             const peerId = `zwift-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             console.log('Creating peer with ID:', peerId);
 
+            // Try to connect to PeerJS cloud server
+            // Note: 0.peerjs.com is the default free cloud service
             this.peer = new Peer(peerId, {
                 debug: 2, // Enable debug logging
+                host: '0.peerjs.com',
+                port: 443,
+                path: '/',
+                secure: true,
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
