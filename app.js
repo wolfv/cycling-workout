@@ -401,10 +401,14 @@ class App {
 
     // Session Management
     async createSession() {
+        console.log('createSession called');
         const userName = document.getElementById('hostNameInput').value.trim() || 'Rider';
+        console.log('User name:', userName);
 
         try {
+            console.log('Calling sessionManager.createSession...');
             const result = await this.sessionManager.createSession(userName);
+            console.log('Session created successfully:', result);
             this.log(`Session created: ${result.sessionId}`, 'success');
 
             // Update UI
@@ -424,8 +428,8 @@ class App {
 
             setTimeout(() => lucide.createIcons(), 0);
         } catch (err) {
+            console.error('createSession error:', err);
             alert('Failed to create session: ' + err.message);
-            console.error(err);
         }
     }
 
