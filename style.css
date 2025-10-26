@@ -1282,3 +1282,57 @@ input[type="number"]:focus {
 .w-full {
     width: 100%;
 }
+
+/* Range slider styling - better visibility */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+/* Track */
+input[type="range"]::-webkit-slider-runnable-track {
+    background: hsl(var(--muted));
+    height: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+input[type="range"]::-moz-range-track {
+    background: hsl(var(--muted));
+    height: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Thumb */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    border: 2px solid hsl(var(--background));
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.2);
+    margin-top: -0.375rem;
+}
+
+input[type="range"]::-moz-range-thumb {
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    border: 2px solid hsl(var(--background));
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.2);
+}
+
+/* Focus state */
+input[type="range"]:focus::-webkit-slider-thumb {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+input[type="range"]:focus::-moz-range-thumb {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}

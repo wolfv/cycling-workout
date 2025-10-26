@@ -557,8 +557,8 @@ class App {
             this.log('Left session', 'warning');
 
             // Update main UI (using Tailwind classes)
-            document.getElementById('sessionJoinBar').classList.remove('hidden');
-            document.getElementById('sessionInfoBar').classList.add('hidden');
+            document.getElementById('sessionPopoverTrigger').classList.remove('hidden');
+            document.getElementById('sessionInfoBadge').classList.add('hidden');
             document.getElementById('ridersCard').classList.add('hidden');
             document.getElementById('hostWorkoutControls').classList.add('hidden');
 
@@ -587,6 +587,9 @@ class App {
             const result = await this.sessionManager.createSession(userName);
             this.log(`Session created: ${result.sessionId}`, 'success');
             this.updateSessionUI(result.sessionId, true);
+
+            // Close the popover
+            document.getElementById('session-popover').hidePopover();
         } catch (err) {
             console.error('quickCreateSession error:', err);
             alert('Failed to create session: ' + err.message);
@@ -609,6 +612,9 @@ class App {
             const result = await this.sessionManager.joinSession(sessionCode, userName);
             this.log(`Joined session: ${result.sessionId}`, 'success');
             this.updateSessionUI(result.sessionId, false);
+
+            // Close the popover
+            document.getElementById('session-popover').hidePopover();
         } catch (err) {
             alert('Failed to join session: ' + err.message);
             console.error(err);
@@ -616,9 +622,9 @@ class App {
     }
 
     updateSessionUI(sessionId, isHost) {
-        // Hide join bar, show info bar (using Tailwind classes)
-        document.getElementById('sessionJoinBar').classList.add('hidden');
-        document.getElementById('sessionInfoBar').classList.remove('hidden');
+        // Hide popover trigger, show info badge (using Tailwind classes)
+        document.getElementById('sessionPopoverTrigger').classList.add('hidden');
+        document.getElementById('sessionInfoBadge').classList.remove('hidden');
         document.getElementById('sessionCodeQuick').textContent = sessionId;
 
         // Show riders card

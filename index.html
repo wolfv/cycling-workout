@@ -77,45 +77,61 @@
         <div class="dashboard">
             <!-- Main Content -->
             <div class="dashboard-main">
-                <!-- Session Join Bar (when not in session) -->
-                <div id="sessionJoinBar" class="card mb-6">
-                    <section>
-                        <form class="form flex gap-3 items-center flex-wrap" onsubmit="app.quickJoinSession(); return false;">
-                            <input type="text" id="quickJoinSessionCode" class="flex-1 min-w-[200px]" placeholder="Paste session code to join friends">
-                            <input type="text" id="quickJoinName" class="w-[150px]" placeholder="Your name" value="Rider">
-                            <button type="submit" class="btn">
-                                <i data-lucide="users"></i>
-                                Join Session
-                            </button>
-                            <button type="button" onclick="app.quickCreateSession()" class="btn-outline">
-                                <i data-lucide="plus-circle"></i>
-                                Create New
-                            </button>
-                        </form>
-                    </section>
-                </div>
-
-                <!-- Session Info Bar (when in session) -->
-                <div id="sessionInfoBar" class="card mb-6 hidden">
-                    <section>
-                        <div class="flex gap-4 items-center justify-between flex-wrap">
-                            <div class="flex gap-3 items-center">
-                                <span class="badge">
-                                    <i data-lucide="users" class="w-3.5 h-3.5"></i>
-                                    Connected
-                                </span>
-                                <span class="font-medium">Session:</span>
-                                <code id="sessionCodeQuick" class="bg-muted px-2 py-1 rounded text-sm">---</code>
-                                <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
-                                    <i data-lucide="copy"></i>
-                                </button>
-                            </div>
-                            <button onclick="app.disconnectSession()" class="btn-sm-destructive">
-                                <i data-lucide="log-out"></i>
-                                Leave Session
-                            </button>
+                <!-- Session Controls -->
+                <div class="flex gap-3 items-center mb-6">
+                    <!-- Join Session Popover (when not connected) -->
+                    <div id="sessionPopoverTrigger">
+                        <button type="button" popovertarget="session-popover" class="btn-outline">
+                            <i data-lucide="users"></i>
+                            <span>Join Session</span>
+                        </button>
+                        <div id="session-popover" popover class="popover w-[400px]">
+                            <article onclick="event.stopPropagation()">
+                                <header class="grid gap-1.5">
+                                    <h4 class="leading-none font-medium">Join or Create Session</h4>
+                                    <p class="text-muted-foreground text-sm">Ride with friends in real-time!</p>
+                                </header>
+                                <section>
+                                    <form class="form grid gap-4" onsubmit="app.quickJoinSession(); return false;">
+                                        <div class="grid gap-2">
+                                            <label for="quickJoinName">Your Name</label>
+                                            <input type="text" id="quickJoinName" placeholder="Rider name" value="Rider">
+                                        </div>
+                                        <div class="grid gap-2">
+                                            <label for="quickJoinSessionCode">Session Code</label>
+                                            <input type="text" id="quickJoinSessionCode" placeholder="Paste code to join">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <button type="submit" class="btn">
+                                                <i data-lucide="users"></i>
+                                                Join
+                                            </button>
+                                            <button type="button" onclick="app.quickCreateSession()" class="btn-outline">
+                                                <i data-lucide="plus-circle"></i>
+                                                Create New
+                                            </button>
+                                        </div>
+                                    </form>
+                                </section>
+                            </article>
                         </div>
-                    </section>
+                    </div>
+
+                    <!-- Session Info (when connected) -->
+                    <div id="sessionInfoBadge" class="hidden flex gap-3 items-center">
+                        <span class="badge">
+                            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                            Connected
+                        </span>
+                        <code id="sessionCodeQuick" class="bg-muted px-2 py-1 rounded text-sm">---</code>
+                        <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
+                            <i data-lucide="copy"></i>
+                        </button>
+                        <button onclick="app.disconnectSession()" class="btn-sm-destructive">
+                            <i data-lucide="log-out"></i>
+                            Leave
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Metrics -->
