@@ -63,9 +63,12 @@ class App {
     }
 
     switchTab(tab) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`tab-${tab}`).classList.add('active');
+        // Update sidebar navigation links
+        document.querySelectorAll('.sidebar nav a').forEach(link => link.classList.remove('active'));
+        const navLink = document.getElementById(`nav-${tab}`);
+        if (navLink) {
+            navLink.classList.add('active');
+        }
 
         // Update tab content
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));

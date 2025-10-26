@@ -10,48 +10,70 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <div class="header-left">
-                <i data-lucide="bike" class="header-icon"></i>
-                <h1 class="header-title">Zwift Hub Controller</h1>
-            </div>
-            <div class="header-right">
-                <button id="connectBtn" onclick="app.connect()" class="btn btn-primary">
-                    <i data-lucide="bluetooth"></i>
-                    <span>Connect</span>
-                </button>
-                <button id="disconnectBtn" onclick="app.disconnect()" disabled class="btn btn-ghost">
-                    <i data-lucide="bluetooth-off"></i>
-                    <span>Disconnect</span>
-                </button>
-            </div>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" data-side="left" aria-hidden="false">
+        <nav aria-label="Main navigation">
+            <section class="scrollbar">
+                <div role="group">
+                    <div style="padding: 1.5rem 1rem; border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                            <i data-lucide="bike" style="width: 28px; height: 28px; color: var(--accent);"></i>
+                            <h2 style="font-size: 1.25rem; font-weight: 600;">Zwift Hub</h2>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <button id="connectBtn" onclick="app.connect()" class="btn-sm w-full">
+                                <i data-lucide="bluetooth"></i>
+                                <span>Connect</span>
+                            </button>
+                            <button id="disconnectBtn" onclick="app.disconnect()" disabled class="btn-sm-outline w-full">
+                                <i data-lucide="bluetooth-off"></i>
+                                <span>Disconnect</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <ul>
+                        <li>
+                            <a href="#" onclick="app.switchTab('ride'); return false;" id="nav-ride" class="active">
+                                <i data-lucide="bike"></i>
+                                <span>Ride</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="app.switchTab('design'); return false;" id="nav-design">
+                                <i data-lucide="pencil"></i>
+                                <span>Design Workout</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="app.switchTab('workouts'); return false;" id="nav-workouts">
+                                <i data-lucide="library"></i>
+                                <span>Workouts</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="app.switchTab('session'); return false;" id="nav-session">
+                                <i data-lucide="users"></i>
+                                <span>Session</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </nav>
+    </aside>
+
+    <main>
+        <!-- Mobile sidebar toggle -->
+        <div style="padding: 1rem; display: none;" id="mobile-nav-toggle">
+            <button type="button" onclick="document.dispatchEvent(new CustomEvent('basecoat:sidebar'))" class="btn-outline">
+                <i data-lucide="menu"></i>
+                <span>Menu</span>
+            </button>
         </div>
-    </header>
 
-    <!-- Tab Navigation -->
-    <nav class="tabs">
-        <button class="tab-btn active" onclick="app.switchTab('ride')" id="tab-ride">
-            <i data-lucide="bike"></i>
-            <span>Ride</span>
-        </button>
-        <button class="tab-btn" onclick="app.switchTab('design')" id="tab-design">
-            <i data-lucide="layout"></i>
-            <span>Design</span>
-        </button>
-        <button class="tab-btn" onclick="app.switchTab('workouts')" id="tab-workouts">
-            <i data-lucide="library"></i>
-            <span>Workouts</span>
-        </button>
-        <button class="tab-btn" onclick="app.switchTab('session')" id="tab-session">
-            <i data-lucide="users"></i>
-            <span>Session</span>
-        </button>
-    </nav>
-
-    <!-- Ride Tab -->
-    <div class="tab-content active" id="content-ride">
+        <!-- Ride Tab -->
+        <div class="tab-content active" id="content-ride">
         <div class="dashboard">
             <!-- Main Content -->
             <div class="dashboard-main">
@@ -622,6 +644,8 @@
             </div>
         </div>
     </div>
+
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
     <script src="ftms.js"></script>
