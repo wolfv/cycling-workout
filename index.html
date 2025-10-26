@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zwift Hub Controller</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <i data-lucide="bike" class="header-icon"></i>
+                <h1 class="header-title">Zwift Hub Controller</h1>
+            </div>
+            <div class="header-right">
+                <button id="connectBtn" onclick="app.connect()" class="btn btn-primary">
+                    <i data-lucide="bluetooth"></i>
+                    <span>Connect</span>
+                </button>
+                <button id="disconnectBtn" onclick="app.disconnect()" disabled class="btn btn-ghost">
+                    <i data-lucide="bluetooth-off"></i>
+                    <span>Disconnect</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+        <button class="tab-btn active" onclick="app.switchTab('ride')" id="tab-ride">
+            <i data-lucide="bike"></i>
+            <span>Ride</span>
+        </button>
+        <button class="tab-btn" onclick="app.switchTab('design')" id="tab-design">
+            <i data-lucide="layout"></i>
+            <span>Design</span>
+        </button>
+        <button class="tab-btn" onclick="app.switchTab('workouts')" id="tab-workouts">
+            <i data-lucide="library"></i>
+            <span>Workouts</span>
+        </button>
+    </nav>
+
+    <!-- Ride Tab -->
+    <div class="tab-content active" id="content-ride">
+        <div class="dashboard">
+            <!-- Left Column -->
+            <div class="dashboard-main">
+                <!-- Metrics -->
+                <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <i data-lucide="zap" class="metric-icon"></i>
+                        <span class="metric-label">Power</span>
+                    </div>
+                    <div class="metric-value" id="powerValue">0</div>
+                    <div class="metric-footer">watts</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <i data-lucide="heart" class="metric-icon"></i>
+                        <span class="metric-label">Heart Rate</span>
+                    </div>
+                    <div class="metric-value" id="hrValue">0</div>
+                    <div class="metric-footer">bpm</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <i data-lucide="gauge" class="metric-icon"></i>
+                        <span class="metric-label">Cadence</span>
+                    </div>
+                    <div class="metric-value" id="cadenceValue">0</div>
+                    <div class="metric-footer">rpm</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <i data-lucide="target" class="metric-icon"></i>
+                        <span class="metric-label">Target</span>
+                    </div>
+                    <div class="metric-value" id="targetPowerValue">--</div>
+                    <div class="metric-footer">watts</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <i data-lucide="activity" class="metric-icon"></i>
+                        <span class="metric-label">Status</span>
+                    </div>
+                    <div class="metric-value metric-status" id="statusValue">--</div>
+                    <div class="metric-footer">connection</div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i data-lucide="line-chart"></i>
+                        <span>Live Data</span>
+                    </h2>
+                </div>
+                <div class="card-content">
+                    <canvas id="liveChart" width="800" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Active Workout -->
+            <div class="card" id="activeWorkoutCard" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i data-lucide="play-circle"></i>
+                        <span id="activeWorkoutName">Active Workout</span>
+                    </h2>
+                    <div class="workout-progress-time" id="workoutProgressTime">0:00 / 0:00</div>
+                </div>
+                <div class="card-content">
+                    <div class="active-interval-info">
+                        <div class="current-interval">
+                            <div class="interval-label">Current</div>
+                            <div class="interval-name" id="currentIntervalName">--</div>
+                            <div class="interval-target" id="currentIntervalTarget">--</div>
+                        </div>
+                        <div class="next-interval">
+                            <div class="interval-label">Next</div>
+                            <div class="interval-name" id="nextIntervalName">--</div>
+                            <div class="interval-target" id="nextIntervalTarget">--</div>
+                        </div>
+                    </div>
+                    <canvas id="workoutProgressChart" width="800" height="120"></canvas>
+                    <div class="workout-controls">
+                        <button onclick="workoutDesigner.stopWorkout()" id="stopWorkoutBtn" class="btn btn-danger btn-lg">
+                            <i data-lucide="square"></i>
+                            <span>Stop Workout</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="dashboard-sidebar">
+            <!-- Quick Control -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i data-lucide="sliders"></i>
+                        <span>Quick Control</span>
+                    </h2>
+                </div>
+                <div class="card-content">
+                    <div class="control-group">
+                        <label class="control-label">Target Power</label>
+                        <div class="power-display" id="powerDisplay">100W</div>
+                        <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.updatePowerDisplay()">
+                        <button onclick="app.setPowerCommand()" id="setPowerBtn" disabled class="btn btn-primary btn-block">
+                            <i data-lucide="send"></i>
+                            <span>Set Power</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i data-lucide="terminal"></i>
+                        <span>Activity Log</span>
+                    </h2>
+                </div>
+                <div class="card-content">
+                    <div class="log" id="log"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Design Tab -->
+    <div class="tab-content" id="content-design">
+        <div class="design-container">
+            <div class="design-header">
+                <h1 class="design-title">Workout Designer</h1>
+                <div class="ftp-input-group">
+                    <label for="ftpInput" class="ftp-label">FTP:</label>
+                    <input type="number" id="ftpInput" value="200" min="50" max="500" onchange="app.updateFTP()">
+                    <span class="ftp-unit">W</span>
+                </div>
+            </div>
+
+            <div class="design-layout">
+                <div class="design-main">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <i data-lucide="layout"></i>
+                                <span>Build Your Workout</span>
+                            </h2>
+                        </div>
+                        <div class="card-content">
+                            <div class="toolbar">
+                                <button onclick="workoutDesigner.addInterval('warmup')" class="btn btn-sm">
+                                    <i data-lucide="sunrise"></i>
+                                    <span>Warmup</span>
+                                </button>
+                                <button onclick="workoutDesigner.addInterval('endurance')" class="btn btn-sm">
+                                    <i data-lucide="gauge"></i>
+                                    <span>Endurance</span>
+                                </button>
+                                <button onclick="workoutDesigner.addInterval('tempo')" class="btn btn-sm">
+                                    <i data-lucide="trending-up"></i>
+                                    <span>Tempo</span>
+                                </button>
+                                <button onclick="workoutDesigner.addInterval('threshold')" class="btn btn-sm">
+                                    <i data-lucide="flame"></i>
+                                    <span>Threshold</span>
+                                </button>
+                                <button onclick="workoutDesigner.addInterval('vo2max')" class="btn btn-sm">
+                                    <i data-lucide="rocket"></i>
+                                    <span>VO2 Max</span>
+                                </button>
+                                <button onclick="workoutDesigner.addInterval('cooldown')" class="btn btn-sm">
+                                    <i data-lucide="sunset"></i>
+                                    <span>Cooldown</span>
+                                </button>
+                                <div class="toolbar-spacer"></div>
+                                <button onclick="workoutDesigner.clearWorkout()" class="btn btn-sm btn-ghost">
+                                    <i data-lucide="trash-2"></i>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                            <div id="workoutTimeline" class="workout-timeline"></div>
+                            <div class="workout-stats">
+                                <div class="stat">
+                                    <i data-lucide="clock"></i>
+                                    <span id="totalDuration">0:00</span>
+                                </div>
+                                <div class="stat">
+                                    <i data-lucide="gauge"></i>
+                                    <span id="avgPower">0</span>W avg
+                                </div>
+                                <div class="stat">
+                                    <i data-lucide="flame"></i>
+                                    <span id="totalWork">0</span>kJ
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="design-sidebar">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <i data-lucide="save"></i>
+                                <span>Manage</span>
+                            </h2>
+                        </div>
+                        <div class="card-content">
+                            <button onclick="app.saveWorkout()" class="btn btn-block">
+                                <i data-lucide="save"></i>
+                                <span>Save Workout</span>
+                            </button>
+                            <button onclick="app.exportWorkout()" class="btn btn-block">
+                                <i data-lucide="download"></i>
+                                <span>Export JSON</span>
+                            </button>
+                            <button onclick="app.importWorkout()" class="btn btn-block">
+                                <i data-lucide="upload"></i>
+                                <span>Import JSON</span>
+                            </button>
+                            <button onclick="app.loadWorkoutForRide()" class="btn btn-primary btn-block">
+                                <i data-lucide="play"></i>
+                                <span>Load & Ride</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workouts Tab -->
+    <div class="tab-content" id="content-workouts">
+        <div class="workouts-container">
+            <div class="workouts-header">
+                <h1 class="workouts-title">Workout Library</h1>
+                <button onclick="app.importWorkout()" class="btn btn-primary">
+                    <i data-lucide="upload"></i>
+                    <span>Import Workout</span>
+                </button>
+            </div>
+            <div id="workoutLibrary" class="workout-library">
+                <!-- Workout cards will be generated here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="ftms.js"></script>
+    <script src="chart.js"></script>
+    <script src="workout-preview.js"></script>
+    <script src="workout-designer.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        // Draw workout previews after DOM is loaded
+        setTimeout(() => WorkoutPreview.refreshAllPreviews(), 100);
+    </script>
+</body>
+</html>
