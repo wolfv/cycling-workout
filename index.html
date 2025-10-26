@@ -42,6 +42,10 @@
             <i data-lucide="library"></i>
             <span>Workouts</span>
         </button>
+        <button class="tab-btn" onclick="app.switchTab('session')" id="tab-session">
+            <i data-lucide="users"></i>
+            <span>Session</span>
+        </button>
     </nav>
 
     <!-- Ride Tab -->
@@ -314,11 +318,169 @@
         </div>
     </div>
 
+    <!-- Session Tab -->
+    <div class="tab-content" id="content-session">
+        <div class="session-container">
+            <div class="session-header">
+                <h1 class="session-title">Ride with Friends</h1>
+            </div>
+
+            <!-- Not Connected State -->
+            <div id="sessionNotConnected" class="session-state">
+                <div class="session-intro">
+                    <i data-lucide="users" style="width: 64px; height: 64px; margin: 0 auto 1.5rem; color: var(--accent); opacity: 0.5;"></i>
+                    <h2>Train Together, Ride Stronger</h2>
+                    <p>Create or join a session to ride with friends. See each other's power, cadence, and race on the same workout!</p>
+                </div>
+
+                <div class="session-actions">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <i data-lucide="plus-circle"></i>
+                                <span>Create Session</span>
+                            </h2>
+                        </div>
+                        <div class="card-content">
+                            <div class="control-group">
+                                <label class="control-label">Your Name</label>
+                                <input type="text" id="hostNameInput" placeholder="Enter your name" value="Rider" class="text-input">
+                                <button onclick="app.createSession()" class="btn btn-primary btn-block btn-lg">
+                                    <i data-lucide="play-circle"></i>
+                                    <span>Create Session</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <i data-lucide="user-plus"></i>
+                                <span>Join Session</span>
+                            </h2>
+                        </div>
+                        <div class="card-content">
+                            <div class="control-group">
+                                <label class="control-label">Your Name</label>
+                                <input type="text" id="joinNameInput" placeholder="Enter your name" value="Rider" class="text-input">
+                                <label class="control-label">Session Code</label>
+                                <input type="text" id="sessionCodeInput" placeholder="e.g., swift-rider-42" class="text-input">
+                                <button onclick="app.joinSession()" class="btn btn-primary btn-block btn-lg">
+                                    <i data-lucide="log-in"></i>
+                                    <span>Join Session</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Connected State -->
+            <div id="sessionConnected" class="session-state" style="display: none;">
+                <div class="session-info-bar">
+                    <div class="session-code-display">
+                        <span class="label">Session:</span>
+                        <span class="code" id="sessionCodeDisplay">---</span>
+                        <button onclick="app.copySessionInfo()" class="btn btn-sm" title="Copy Share Link">
+                            <i data-lucide="copy"></i>
+                        </button>
+                    </div>
+                    <div class="session-peer-id">
+                        <span class="label">Peer ID:</span>
+                        <span class="code" id="peerIdDisplay">---</span>
+                    </div>
+                    <button onclick="app.disconnectSession()" class="btn btn-danger">
+                        <i data-lucide="log-out"></i>
+                        <span>Leave Session</span>
+                    </button>
+                </div>
+
+                <!-- Video Chat Section -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i data-lucide="video"></i>
+                            <span>Video Chat</span>
+                        </h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="video-chat-info">
+                            <p>Connect with your friends via Google Meet:</p>
+                            <div class="control-group">
+                                <input type="text" id="meetLinkInput" placeholder="Paste Google Meet link" class="text-input">
+                                <button onclick="app.openMeetLink()" class="btn btn-primary btn-block">
+                                    <i data-lucide="external-link"></i>
+                                    <span>Open Google Meet</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Race Track -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i data-lucide="flag"></i>
+                            <span>Race Track</span>
+                        </h2>
+                    </div>
+                    <div class="card-content">
+                        <canvas id="raceTrackCanvas" width="1000" height="300"></canvas>
+                    </div>
+                </div>
+
+                <!-- Participants List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i data-lucide="users"></i>
+                            <span>Participants</span>
+                        </h2>
+                    </div>
+                    <div class="card-content">
+                        <div id="participantsList" class="participants-list">
+                            <!-- Participants will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Controls (Host Only) -->
+                <div id="sessionHostControls" class="card" style="display: none;">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i data-lucide="settings"></i>
+                            <span>Host Controls</span>
+                        </h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="countdown-display" id="countdownDisplay" style="display: none;">
+                            <div class="countdown-number" id="countdownNumber">5</div>
+                            <div class="countdown-text">Get Ready!</div>
+                        </div>
+                        <button onclick="app.startSyncedWorkout()" id="startSyncedBtn" class="btn btn-primary btn-block btn-lg">
+                            <i data-lucide="play"></i>
+                            <span>Start Synchronized Workout (5s countdown)</span>
+                        </button>
+                        <button onclick="app.endSyncedWorkout()" id="endSyncedBtn" class="btn btn-danger btn-block" style="display: none; margin-top: 0.75rem;">
+                            <i data-lucide="square"></i>
+                            <span>End Workout for All</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="ftms.js"></script>
     <script src="chart.js"></script>
     <script src="workout-preview.js"></script>
     <script src="workout-progress.js"></script>
     <script src="workout-designer.js"></script>
+    <script src="session.js"></script>
+    <script src="racetrack.js"></script>
     <script src="app.js"></script>
     <script>
         // Initialize Lucide icons
