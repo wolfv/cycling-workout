@@ -162,6 +162,22 @@
                 </div>
             </div>
 
+            <!-- Workout Control -->
+            <div class="card" id="workoutControlCard" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i data-lucide="play-circle"></i>
+                        <span>Workout Ready</span>
+                    </h2>
+                </div>
+                <div class="card-content">
+                    <button onclick="workoutDesigner.startWorkout()" id="startWorkoutBtn" class="btn btn-primary btn-block btn-lg">
+                        <i data-lucide="play"></i>
+                        <span>Start Workout</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Activity Log -->
             <div class="card">
                 <div class="card-header">
@@ -301,6 +317,7 @@
     <script src="ftms.js"></script>
     <script src="chart.js"></script>
     <script src="workout-preview.js"></script>
+    <script src="workout-progress.js"></script>
     <script src="workout-designer.js"></script>
     <script src="app.js"></script>
     <script>

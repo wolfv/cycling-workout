@@ -93,13 +93,23 @@ class App {
     handleWorkoutStart() {
         // Show active workout card when workout starts
         document.getElementById('activeWorkoutCard').style.display = 'block';
+        // Hide workout control card
+        document.getElementById('workoutControlCard').style.display = 'none';
         // Switch to ride tab
         this.switchTab('ride');
+        // Re-initialize icons
+        setTimeout(() => lucide.createIcons(), 0);
     }
 
     handleWorkoutStop() {
         // Hide active workout card when workout stops
         document.getElementById('activeWorkoutCard').style.display = 'none';
+        // Show workout control card again if we have intervals
+        if (window.workoutDesigner.intervals.length > 0) {
+            document.getElementById('workoutControlCard').style.display = 'block';
+        }
+        // Re-initialize icons
+        setTimeout(() => lucide.createIcons(), 0);
     }
 
     loadWorkoutForRide() {
@@ -107,6 +117,8 @@ class App {
             alert('Please design a workout first!');
             return;
         }
+        // Show workout control card
+        document.getElementById('workoutControlCard').style.display = 'block';
         // Switch to ride tab
         this.switchTab('ride');
         this.log('Workout loaded! Connect your trainer and click "Start Workout" in the sidebar.', 'success');
@@ -234,6 +246,8 @@ class App {
 
     loadWorkoutFromLibrary(name) {
         window.workoutDesigner.loadWorkout(name);
+        // Show workout control card when loading from library
+        document.getElementById('workoutControlCard').style.display = 'block';
         this.switchTab('design');
     }
 

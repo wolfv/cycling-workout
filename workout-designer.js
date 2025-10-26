@@ -9,6 +9,8 @@ class WorkoutDesigner {
         this.currentIntervalIndex = -1;
         this.workoutTimer = null;
         this.workoutStartTime = null;
+        this.intervalStartTime = null;
+        this.progressUpdateInterval = null;
         this.onTargetPowerChange = null;
         this.onWorkoutStart = null;
         this.onWorkoutStop = null;
@@ -17,6 +19,9 @@ class WorkoutDesigner {
         this.timelineEl = document.getElementById('workoutTimeline');
         this.setupTimeline();
         this.loadWorkouts();
+
+        // Initialize progress visualizer
+        this.progressVisualizer = null;
     }
 
     setupTimeline() {
@@ -217,8 +222,19 @@ class WorkoutDesigner {
         this.isRunning = true;
         this.currentIntervalIndex = 0;
         this.workoutStartTime = Date.now();
+        this.intervalStartTime = Date.now();
 
         this.ftms.log('🎯 Starting workout!', 'success');
+
+        // Initialize progress visualizer
+        this.progressVisualizer = new WorkoutProgressVisualizer('workoutProgressChart');
+        this.progressVisualizer.setWorkout(this.intervals, this.ftp);
+        this.progressVisualizer.start(this.workoutStartTime);
+
+        // Start progress update loop (update every 100ms for smooth progress bar)
+        this.progressUpdateInterval = setInterval(() => {
+            this.updateProgress();
+        }, 100);
 
         if (this.onWorkoutStart) {
             this.onWorkoutStart();
@@ -234,11 +250,13 @@ class WorkoutDesigner {
         }
 
         this.currentIntervalIndex = index;
+        this.intervalStartTime = Date.now();
         const interval = this.intervals[index];
         const power = Math.round(this.ftp * (interval.percentage / 100));
 
         this.ftms.log(`${interval.name}: ${power}W (${interval.percentage}% FTP) for ${this.formatDuration(interval.duration)}`, 'info');
         this.render();
+        this.updateProgress();
 
         // Set target power
         await this.ftms.setTargetPower(power);
@@ -258,11 +276,22 @@ class WorkoutDesigner {
             this.workoutTimer = null;
         }
 
+        if (this.progressUpdateInterval) {
+            clearInterval(this.progressUpdateInterval);
+            this.progressUpdateInterval = null;
+        }
+
         this.isRunning = false;
         this.currentIntervalIndex = -1;
 
         this.ftms.log('Workout stopped', 'warning');
         this.render();
+
+        // Clear progress visualizer
+        if (this.progressVisualizer) {
+            this.progressVisualizer.clear();
+            this.progressVisualizer = null;
+        }
 
         // Reset power
         this.ftms.setTargetPower(0);
@@ -273,6 +302,46 @@ class WorkoutDesigner {
         if (this.onWorkoutStop) {
             this.onWorkoutStop();
         }
+    }
+
+    updateProgress() {
+        if (!this.isRunning || this.currentIntervalIndex < 0) return;
+
+        const now = Date.now();
+        const elapsedInInterval = (now - this.intervalStartTime) / 1000; // seconds
+        const totalElapsed = (now - this.workoutStartTime) / 1000; // seconds
+
+        // Update progress visualizer
+        if (this.progressVisualizer) {
+            this.progressVisualizer.updateProgress(this.currentIntervalIndex, elapsedInInterval);
+        }
+
+        // Update current interval info
+        const currentInterval = this.intervals[this.currentIntervalIndex];
+        if (currentInterval) {
+            const power = Math.round(this.ftp * (currentInterval.percentage / 100));
+            const remaining = Math.max(0, currentInterval.duration - elapsedInInterval);
+
+            document.getElementById('currentIntervalName').textContent = currentInterval.name;
+            document.getElementById('currentIntervalTarget').textContent = `${power}W (${this.formatDuration(Math.round(remaining))} left)`;
+        }
+
+        // Update next interval info
+        const nextInterval = this.intervals[this.currentIntervalIndex + 1];
+        if (nextInterval) {
+            const nextPower = Math.round(this.ftp * (nextInterval.percentage / 100));
+            document.getElementById('nextIntervalName').textContent = nextInterval.name;
+            document.getElementById('nextIntervalTarget').textContent = `${nextPower}W for ${this.formatDuration(nextInterval.duration)}`;
+        } else {
+            document.getElementById('nextIntervalName').textContent = 'Finish';
+            document.getElementById('nextIntervalTarget').textContent = 'Last interval!';
+        }
+
+        // Update workout progress time
+        const totalDuration = this.intervals.reduce((sum, i) => sum + i.duration, 0);
+        const totalRemaining = Math.max(0, totalDuration - totalElapsed);
+        document.getElementById('workoutProgressTime').textContent =
+            `${this.formatDuration(Math.round(totalElapsed))} / ${this.formatDuration(totalDuration)} (${this.formatDuration(Math.round(totalRemaining))} left)`;
     }
 
     // Save/Load Functionality
