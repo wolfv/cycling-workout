@@ -23,15 +23,43 @@ class App {
         this.sessionManager.onParticipantUpdate = (participants) => this.handleParticipantUpdate(participants);
         this.sessionManager.onSessionStart = (startTime) => this.handleSessionStart(startTime);
         this.sessionManager.onSessionEnd = () => this.handleSessionEnd();
+        this.sessionManager.onWorkoutReceived = (workout) => this.handleWorkoutReceived(workout);
 
         // Initialize race track visualizer
         this.raceTrack = new RaceTrackVisualizer('raceTrackCanvas');
+
+        // Initialize workout recorder
+        this.workoutRecorder = new WorkoutRecorder();
 
         // Metrics broadcast interval
         this.metricsBroadcastInterval = null;
 
         // Load workout library
         this.refreshWorkoutLibrary();
+
+        // Attempt to restore session from localStorage
+        this.attemptSessionRestore();
+    }
+
+    async attemptSessionRestore() {
+        const result = await this.sessionManager.restoreSession();
+        if (result) {
+            this.log('Session restored successfully!', 'success');
+
+            // Update UI based on host/participant
+            document.getElementById('sessionNotConnected').style.display = 'none';
+            document.getElementById('sessionConnected').style.display = 'block';
+            document.getElementById('sessionCodeDisplay').textContent = result.sessionId;
+
+            if (this.sessionManager.isHost) {
+                document.getElementById('sessionHostControls').style.display = 'block';
+            }
+
+            // Set FTP input
+            document.getElementById('sessionFtpInput').value = window.workoutDesigner.ftp;
+
+            setTimeout(() => lucide.createIcons(), 0);
+        }
     }
 
     switchTab(tab) {
@@ -73,6 +101,11 @@ class App {
         // Update chart
         const targetPower = this.chart.currentTargetPower;
         this.chart.addDataPoint(metrics.power, metrics.hr, targetPower);
+
+        // Record data point if workout is active
+        if (this.workoutRecorder.isRecording) {
+            this.workoutRecorder.recordDataPoint(metrics.power, metrics.hr, metrics.cadence || 0);
+        }
 
         // Broadcast to session if connected
         if (this.sessionManager && this.sessionManager.sessionId) {
@@ -121,21 +154,90 @@ class App {
         document.getElementById('activeWorkoutCard').style.display = 'block';
         // Hide workout control card
         document.getElementById('workoutControlCard').style.display = 'none';
+        // Hide workout summary if showing
+        document.getElementById('workoutSummaryCard').style.display = 'none';
         // Switch to ride tab
         this.switchTab('ride');
+
+        // Start recording workout
+        const workoutName = 'Indoor Cycling Workout';
+        this.workoutRecorder.start(workoutName);
+        this.log('Recording started', 'success');
+
         // Re-initialize icons
         setTimeout(() => lucide.createIcons(), 0);
     }
 
     handleWorkoutStop() {
+        // Stop recording
+        const dataPoints = this.workoutRecorder.stop();
+        this.log(`Recording stopped: ${dataPoints} data points`, 'info');
+
         // Hide active workout card when workout stops
         document.getElementById('activeWorkoutCard').style.display = 'none';
+
+        // Show workout summary if we have data
+        if (dataPoints > 0) {
+            this.showWorkoutSummary();
+        } else {
+            // Show workout control card again if we have intervals
+            if (window.workoutDesigner.intervals.length > 0) {
+                document.getElementById('workoutControlCard').style.display = 'block';
+            }
+        }
+
+        // Re-initialize icons
+        setTimeout(() => lucide.createIcons(), 0);
+    }
+
+    showWorkoutSummary() {
+        const stats = this.workoutRecorder.getStats();
+
+        // Update summary display
+        document.getElementById('summaryDuration').textContent = this.workoutRecorder.formatDuration(stats.duration);
+        document.getElementById('summaryAvgPower').textContent = `${stats.avgPower}W`;
+        document.getElementById('summaryMaxPower').textContent = `${stats.maxPower}W`;
+        document.getElementById('summaryAvgCadence').textContent = `${stats.avgCadence} rpm`;
+        document.getElementById('summaryWork').textContent = `${stats.totalWork} kJ`;
+        document.getElementById('summaryAvgHR').textContent = stats.avgHeartRate > 0 ? `${stats.avgHeartRate} bpm` : 'N/A';
+
+        // Show summary card
+        document.getElementById('workoutSummaryCard').style.display = 'block';
+
+        // Re-initialize icons
+        setTimeout(() => lucide.createIcons(), 0);
+    }
+
+    dismissWorkoutSummary() {
+        document.getElementById('workoutSummaryCard').style.display = 'none';
+
         // Show workout control card again if we have intervals
         if (window.workoutDesigner.intervals.length > 0) {
             document.getElementById('workoutControlCard').style.display = 'block';
         }
-        // Re-initialize icons
+
+        // Clear recorded data
+        this.workoutRecorder.clear();
+
         setTimeout(() => lucide.createIcons(), 0);
+    }
+
+    downloadWorkoutTCX() {
+        try {
+            const filename = this.workoutRecorder.downloadTCX();
+            this.log(`Downloaded: ${filename}`, 'success');
+        } catch (err) {
+            alert('Failed to download TCX: ' + err.message);
+        }
+    }
+
+    downloadWorkoutJSON() {
+        try {
+            const filename = this.workoutRecorder.downloadJSON();
+            this.log(`Downloaded: ${filename}`, 'success');
+        } catch (err) {
+            alert('Failed to download JSON: ' + err.message);
+        }
     }
 
     loadWorkoutForRide() {
@@ -185,7 +287,7 @@ class App {
     }
 
     async setPowerCommand() {
-        const power = parseInt(document.getElementById('powerInput').value);
+        const power = parseInt(document.getElementById('powerSlider').value);
         this.log(`Setting power to ${power}W...`, 'info');
 
         const success = await this.ftms.setTargetPower(power);
@@ -309,8 +411,11 @@ class App {
             document.getElementById('sessionNotConnected').style.display = 'none';
             document.getElementById('sessionConnected').style.display = 'block';
             document.getElementById('sessionCodeDisplay').textContent = result.sessionId;
-            document.getElementById('peerIdDisplay').textContent = result.peerId;
             document.getElementById('sessionHostControls').style.display = 'block';
+
+            // Set FTP input to current workout designer FTP
+            document.getElementById('sessionFtpInput').value = window.workoutDesigner.ftp;
+            this.sessionManager.updateFTP(window.workoutDesigner.ftp);
 
             // Setup race track
             if (window.workoutDesigner.intervals.length > 0) {
@@ -326,22 +431,25 @@ class App {
 
     async joinSession() {
         const userName = document.getElementById('joinNameInput').value.trim() || 'Rider';
-        const sessionId = document.getElementById('sessionCodeInput').value.trim();
+        const sessionCode = document.getElementById('sessionCodeInput').value.trim();
 
-        if (!sessionId) {
+        if (!sessionCode) {
             alert('Please enter a session code');
             return;
         }
 
         try {
-            const result = await this.sessionManager.joinSession(sessionId, userName);
+            const result = await this.sessionManager.joinSession(sessionCode, userName);
             this.log(`Joined session: ${result.sessionId}`, 'success');
 
             // Update UI
             document.getElementById('sessionNotConnected').style.display = 'none';
             document.getElementById('sessionConnected').style.display = 'block';
             document.getElementById('sessionCodeDisplay').textContent = result.sessionId;
-            document.getElementById('peerIdDisplay').textContent = result.peerId;
+
+            // Set FTP input to current workout designer FTP
+            document.getElementById('sessionFtpInput').value = window.workoutDesigner.ftp;
+            this.sessionManager.updateFTP(window.workoutDesigner.ftp);
 
             setTimeout(() => lucide.createIcons(), 0);
         } catch (err) {
@@ -372,50 +480,97 @@ class App {
         const shareInfo = this.sessionManager.getShareInfo();
         if (!shareInfo) return;
 
-        const text = `Join my Zwift Hub workout!\n\nSession Code: ${shareInfo.sessionId}\nPeer ID: ${shareInfo.peerId}\n\nOr use this link: ${shareInfo.url}`;
+        const text = `Join my Zwift Hub workout!\n\nSession Code:\n${shareInfo.sessionId}\n\nPaste this code in the Session tab to join!`;
 
         navigator.clipboard.writeText(text).then(() => {
-            this.log('Session info copied to clipboard!', 'success');
+            this.log('Session code copied to clipboard!', 'success');
         }).catch(err => {
             alert('Failed to copy: ' + err.message);
         });
     }
 
     handleParticipantUpdate(participants) {
-        // Update participants list
+        // Update participants list in Session tab
         const listEl = document.getElementById('participantsList');
-        if (!listEl) return;
-
-        if (participants.length === 0) {
-            listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>';
-            return;
+        if (listEl) {
+            if (participants.length === 0) {
+                listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>';
+            } else {
+                listEl.innerHTML = participants.map(p => `
+                    <div class="participant-card ${p.isHost ? 'host' : ''}">
+                        <div class="participant-info">
+                            <div class="participant-name">
+                                ${p.name}
+                                ${p.isHost ? '<span class="host-badge">HOST</span>' : ''}
+                                <span class="ftp-badge">${p.ftp}W FTP</span>
+                            </div>
+                            <div class="participant-metrics">
+                                <span><i data-lucide="zap"></i> ${p.power}W</span>
+                                <span><i data-lucide="gauge"></i> ${p.cadence} rpm</span>
+                            </div>
+                        </div>
+                        <div class="participant-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${p.progress * 100}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
         }
 
-        listEl.innerHTML = participants.map(p => `
-            <div class="participant-card ${p.isHost ? 'host' : ''}">
-                <div class="participant-info">
-                    <div class="participant-name">
-                        ${p.name}
-                        ${p.isHost ? '<span class="host-badge">HOST</span>' : ''}
+        // Update compact participants list in Active Workout card
+        const workoutListEl = document.getElementById('workoutParticipantsList');
+        const workoutSectionEl = document.getElementById('workoutParticipantsSection');
+
+        if (workoutListEl && workoutSectionEl) {
+            if (participants.length > 0) {
+                workoutSectionEl.style.display = 'block';
+                workoutListEl.innerHTML = participants.map(p => `
+                    <div class="workout-participant-compact ${p.isHost ? 'host' : ''}">
+                        <div class="workout-participant-name">
+                            ${p.name}
+                            ${p.isHost ? '<span class="host-badge-mini">HOST</span>' : ''}
+                        </div>
+                        <div class="workout-participant-stats">
+                            <span class="stat-compact"><i data-lucide="zap"></i>${p.power}W</span>
+                            <span class="stat-compact"><i data-lucide="gauge"></i>${p.cadence}rpm</span>
+                            <span class="stat-compact ftp-mini">${p.ftp}W FTP</span>
+                        </div>
                     </div>
-                    <div class="participant-metrics">
-                        <span><i data-lucide="zap"></i> ${p.power}W</span>
-                        <span><i data-lucide="gauge"></i> ${p.cadence} rpm</span>
-                    </div>
-                </div>
-                <div class="participant-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${p.progress * 100}%"></div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+                `).join('');
+            } else {
+                workoutSectionEl.style.display = 'none';
+            }
+        }
 
         setTimeout(() => lucide.createIcons(), 0);
 
         // Update race track
         this.raceTrack.setParticipants(participants);
         this.raceTrack.draw();
+    }
+
+    handleWorkoutReceived(workout) {
+        if (!workout) return;
+
+        this.log('Received workout from host!', 'success');
+
+        // Load the workout intervals into the designer
+        window.workoutDesigner.intervals = workout.intervals.map(i => ({
+            ...i,
+            id: Date.now() + Math.random()
+        }));
+
+        // Don't override local FTP - each participant uses their own
+        window.workoutDesigner.render();
+        window.workoutDesigner.updateWorkoutInfo();
+
+        // Setup race track with received workout
+        this.raceTrack.setWorkout(workout.intervals, window.workoutDesigner.ftp);
+
+        // Show notification
+        alert(`Workout received: ${workout.name || 'Unnamed Workout'}\n\nThe workout has been loaded and will scale to your FTP (${window.workoutDesigner.ftp}W).\n\nYou can adjust your FTP in the "My FTP" section above.`);
     }
 
     handleSessionStart(startTime) {
@@ -473,11 +628,41 @@ class App {
             return;
         }
 
+        // Share workout with all participants
+        const workout = {
+            name: 'Shared Workout',
+            intervals: window.workoutDesigner.intervals,
+            ftp: window.workoutDesigner.ftp // Host's FTP as reference
+        };
+        this.sessionManager.shareWorkout(workout);
+
         // Setup race track with workout
         this.raceTrack.setWorkout(window.workoutDesigner.intervals, window.workoutDesigner.ftp);
 
         // Start synchronized countdown
         this.sessionManager.startSynchronizedWorkout(5);
+    }
+
+    updateSessionFTP() {
+        const ftp = parseInt(document.getElementById('sessionFtpInput').value);
+        if (isNaN(ftp) || ftp < 50 || ftp > 500) {
+            alert('Please enter a valid FTP between 50 and 500');
+            return;
+        }
+
+        // Update local FTP
+        window.workoutDesigner.setFTP(ftp);
+
+        // Broadcast to all session participants
+        if (this.sessionManager && this.sessionManager.sessionId) {
+            this.sessionManager.updateFTP(ftp);
+            this.log(`FTP updated to ${ftp}W and shared with group`, 'success');
+        }
+
+        // Update race track if workout is loaded
+        if (window.workoutDesigner.intervals.length > 0) {
+            this.raceTrack.setWorkout(window.workoutDesigner.intervals, ftp);
+        }
     }
 
     endSyncedWorkout() {

@@ -133,11 +133,87 @@
                         </div>
                     </div>
                     <canvas id="workoutProgressChart" width="800" height="120"></canvas>
+
+                    <!-- Session Participants (if in session) -->
+                    <div id="workoutParticipantsSection" style="display: none;">
+                        <div class="workout-participants-header">
+                            <i data-lucide="users"></i>
+                            <span>Riding Together</span>
+                        </div>
+                        <div id="workoutParticipantsList" class="workout-participants-list">
+                            <!-- Participants will be rendered here -->
+                        </div>
+                    </div>
+
                     <div class="workout-controls">
                         <button onclick="workoutDesigner.stopWorkout()" id="stopWorkoutBtn" class="btn btn-danger btn-lg">
                             <i data-lucide="square"></i>
                             <span>Stop Workout</span>
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workout Summary (after completion) -->
+            <div class="card" id="workoutSummaryCard" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i data-lucide="check-circle"></i>
+                        <span>Workout Complete!</span>
+                    </h2>
+                </div>
+                <div class="card-content">
+                    <div class="workout-summary-stats">
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Duration</div>
+                            <div class="summary-stat-value" id="summaryDuration">--</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Avg Power</div>
+                            <div class="summary-stat-value" id="summaryAvgPower">--</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Max Power</div>
+                            <div class="summary-stat-value" id="summaryMaxPower">--</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Avg Cadence</div>
+                            <div class="summary-stat-value" id="summaryAvgCadence">--</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Total Work</div>
+                            <div class="summary-stat-value" id="summaryWork">--</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Avg HR</div>
+                            <div class="summary-stat-value" id="summaryAvgHR">--</div>
+                        </div>
+                    </div>
+
+                    <div class="workout-summary-actions">
+                        <button onclick="app.downloadWorkoutTCX()" class="btn btn-primary btn-lg">
+                            <i data-lucide="upload"></i>
+                            <span>Download TCX for Strava</span>
+                        </button>
+                        <button onclick="app.downloadWorkoutJSON()" class="btn btn-ghost">
+                            <i data-lucide="download"></i>
+                            <span>Download JSON</span>
+                        </button>
+                        <button onclick="app.dismissWorkoutSummary()" class="btn btn-ghost">
+                            <i data-lucide="x"></i>
+                            <span>Close</span>
+                        </button>
+                    </div>
+
+                    <div class="workout-summary-help">
+                        <p><strong>Upload to Strava:</strong></p>
+                        <ol>
+                            <li>Download the TCX file above</li>
+                            <li>Go to <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a></li>
+                            <li>Upload the TCX file</li>
+                            <li>Add title, description, and publish!</li>
+                        </ol>
+                        <p>TCX files also work with Garmin Connect, TrainingPeaks, and most fitness platforms.</p>
                     </div>
                 </div>
             </div>
@@ -365,7 +441,8 @@
                                 <label class="control-label">Your Name</label>
                                 <input type="text" id="joinNameInput" placeholder="Enter your name" value="Rider" class="text-input">
                                 <label class="control-label">Session Code</label>
-                                <input type="text" id="sessionCodeInput" placeholder="e.g., swift-rider-42" class="text-input">
+                                <input type="text" id="sessionCodeInput" placeholder="e.g., swift-rider-42-abc123xyz" class="text-input">
+                                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">Paste the full session code from your friend</p>
                                 <button onclick="app.joinSession()" class="btn btn-primary btn-block btn-lg">
                                     <i data-lucide="log-in"></i>
                                     <span>Join Session</span>
@@ -380,20 +457,35 @@
             <div id="sessionConnected" class="session-state" style="display: none;">
                 <div class="session-info-bar">
                     <div class="session-code-display">
-                        <span class="label">Session:</span>
+                        <span class="label">Session Code:</span>
                         <span class="code" id="sessionCodeDisplay">---</span>
-                        <button onclick="app.copySessionInfo()" class="btn btn-sm" title="Copy Share Link">
+                        <button onclick="app.copySessionInfo()" class="btn btn-sm" title="Copy Session Code">
                             <i data-lucide="copy"></i>
                         </button>
-                    </div>
-                    <div class="session-peer-id">
-                        <span class="label">Peer ID:</span>
-                        <span class="code" id="peerIdDisplay">---</span>
                     </div>
                     <button onclick="app.disconnectSession()" class="btn btn-danger">
                         <i data-lucide="log-out"></i>
                         <span>Leave Session</span>
                     </button>
+                </div>
+
+                <!-- My FTP Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i data-lucide="gauge"></i>
+                            <span>My FTP</span>
+                        </h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="control-group">
+                            <label class="control-label">Your FTP (Watts)</label>
+                            <div class="ftp-control">
+                                <input type="number" id="sessionFtpInput" value="200" min="50" max="500" class="text-input" onchange="app.updateSessionFTP()">
+                                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">Workout will scale to your FTP. You can adjust this anytime!</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Video Chat Section -->
@@ -478,6 +570,7 @@
     <script src="chart.js"></script>
     <script src="workout-preview.js"></script>
     <script src="workout-progress.js"></script>
+    <script src="workout-recorder.js"></script>
     <script src="workout-designer.js"></script>
     <script src="session.js"></script>
     <script src="racetrack.js"></script>

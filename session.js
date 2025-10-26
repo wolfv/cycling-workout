@@ -9,18 +9,105 @@ class SessionManager {
         this.onParticipantUpdate = null;
         this.onSessionStart = null;
         this.onSessionEnd = null;
+        this.onWorkoutReceived = null;
         this.workoutStartTime = null;
         this.syncInterval = null;
+        this.sharedWorkout = null; // The workout intervals shared by host
+        this.userName = null;
     }
 
-    // Generate a short, memorable session code
-    generateSessionCode() {
+    // Save session state to localStorage
+    saveSessionState() {
+        const state = {
+            sessionId: this.sessionId,
+            isHost: this.isHost,
+            userName: this.userName,
+            createdAt: Date.now(),
+            workout: this.sharedWorkout
+        };
+        localStorage.setItem('zwift_session_state', JSON.stringify(state));
+    }
+
+    // Load session state from localStorage
+    loadSessionState() {
+        const stored = localStorage.getItem('zwift_session_state');
+        if (!stored) return null;
+
+        try {
+            const state = JSON.parse(stored);
+
+            // Check if session is too old (> 24 hours)
+            const age = Date.now() - state.createdAt;
+            if (age > 24 * 60 * 60 * 1000) {
+                this.clearSessionState();
+                return null;
+            }
+
+            return state;
+        } catch (err) {
+            console.error('Failed to load session state:', err);
+            return null;
+        }
+    }
+
+    // Clear session state from localStorage
+    clearSessionState() {
+        localStorage.removeItem('zwift_session_state');
+    }
+
+    // Attempt to restore session from localStorage
+    async restoreSession() {
+        const state = this.loadSessionState();
+        if (!state) return null;
+
+        console.log('Attempting to restore session:', state.sessionId);
+
+        try {
+            if (state.isHost) {
+                // Restore as host
+                return await this.createSession(state.userName);
+            } else {
+                // Restore as participant - rejoin
+                return await this.joinSession(state.sessionId, state.userName);
+            }
+        } catch (err) {
+            console.error('Failed to restore session:', err);
+            this.clearSessionState();
+            return null;
+        }
+    }
+
+    // Generate a short, memorable session code with encoded peer ID
+    generateSessionCode(peerId) {
         const adjectives = ['swift', 'power', 'turbo', 'epic', 'mega', 'super', 'ultra', 'hyper'];
         const nouns = ['rider', 'cycler', 'racer', 'pedal', 'wheel', 'chain', 'sprint', 'climb'];
         const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
         const noun = nouns[Math.floor(Math.random() * nouns.length)];
         const num = Math.floor(Math.random() * 100);
-        return `${adj}-${noun}-${num}`;
+
+        // Encode peer ID as base64 and append
+        const encodedPeerId = btoa(peerId).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        return `${adj}-${noun}-${num}-${encodedPeerId}`;
+    }
+
+    // Decode host peer ID from session code
+    decodeSessionCode(sessionCode) {
+        const parts = sessionCode.split('-');
+        if (parts.length < 4) {
+            throw new Error('Invalid session code format');
+        }
+
+        // Last part is the encoded peer ID
+        const encodedPeerId = parts[parts.length - 1];
+        const base64 = encodedPeerId.replace(/-/g, '+').replace(/_/g, '/');
+
+        try {
+            const hostPeerId = atob(base64);
+            const sessionId = parts.slice(0, 3).join('-'); // e.g., "swift-rider-42"
+            return { hostPeerId, sessionId };
+        } catch (err) {
+            throw new Error('Invalid session code: could not decode peer ID');
+        }
     }
 
     // Create a new session (host)
@@ -40,15 +127,10 @@ class SessionManager {
             });
 
             this.peer.on('open', (id) => {
-                this.sessionId = this.generateSessionCode();
+                this.sessionId = this.generateSessionCode(id);
                 this.isHost = true;
-
-                // Store session info
-                const sessionInfo = {
-                    sessionId: this.sessionId,
-                    hostPeerId: id,
-                    created: Date.now()
-                };
+                this.hostPeerId = id;
+                this.userName = userName;
 
                 // Add self as participant
                 this.participants.set(id, {
@@ -57,9 +139,13 @@ class SessionManager {
                     power: 0,
                     cadence: 0,
                     progress: 0,
+                    ftp: 200, // Default FTP
                     isHost: true,
                     connected: true
                 });
+
+                // Save session state
+                this.saveSessionState();
 
                 console.log('Session created:', this.sessionId, 'PeerID:', id);
                 resolve({ sessionId: this.sessionId, peerId: id });
@@ -77,18 +163,16 @@ class SessionManager {
     }
 
     // Join an existing session
-    async joinSession(sessionId, userName) {
+    async joinSession(sessionCode, userName) {
         return new Promise((resolve, reject) => {
-            // First, we need to discover the host's peer ID
-            // For simplicity, we'll encode it in the session code
-            // Format: word-word-num-hostpeerid
-
-            // For now, let's use a simple approach: prompt for host peer ID
-            // In production, you'd want a signaling server
-
-            const hostPeerId = prompt('Enter host Peer ID (provided by session host):');
-            if (!hostPeerId) {
-                reject(new Error('No host peer ID provided'));
+            // Decode the session code to extract host peer ID
+            let hostPeerId, sessionId;
+            try {
+                const decoded = this.decodeSessionCode(sessionCode);
+                hostPeerId = decoded.hostPeerId;
+                sessionId = decoded.sessionId;
+            } catch (err) {
+                reject(err);
                 return;
             }
 
@@ -115,20 +199,26 @@ class SessionManager {
 
                 conn.on('open', () => {
                     console.log('Connected to host');
-                    this.sessionId = sessionId;
+                    this.sessionId = sessionCode; // Store full session code
                     this.isHost = false;
+                    this.hostPeerId = hostPeerId;
+                    this.userName = userName;
 
-                    // Send join message
+                    // Send join message with FTP
                     conn.send({
                         type: 'join',
                         id,
-                        name: userName
+                        name: userName,
+                        ftp: 200 // Default FTP, will be updated by user
                     });
 
                     this.connections.set(hostPeerId, conn);
                     this.setupConnectionHandlers(conn, hostPeerId);
 
-                    resolve({ sessionId, peerId: id });
+                    // Save session state
+                    this.saveSessionState();
+
+                    resolve({ sessionId: sessionCode, peerId: id });
                 });
 
                 conn.on('error', (err) => {
@@ -182,6 +272,7 @@ class SessionManager {
                     power: 0,
                     cadence: 0,
                     progress: 0,
+                    ftp: data.ftp || 200,
                     isHost: false,
                     connected: true
                 });
@@ -190,9 +281,11 @@ class SessionManager {
                 if (this.isHost) {
                     const conn = this.connections.get(fromPeerId);
                     if (conn) {
+                        // Send participants and workout
                         conn.send({
-                            type: 'participants',
-                            participants: Array.from(this.participants.values())
+                            type: 'session-info',
+                            participants: Array.from(this.participants.values()),
+                            workout: this.sharedWorkout
                         });
                     }
 
@@ -205,6 +298,49 @@ class SessionManager {
 
                 if (this.onParticipantUpdate) {
                     this.onParticipantUpdate(Array.from(this.participants.values()));
+                }
+                break;
+
+            case 'session-info':
+                // Received session info from host (participants + workout)
+                data.participants.forEach(p => {
+                    this.participants.set(p.id, p);
+                });
+
+                if (data.workout) {
+                    this.sharedWorkout = data.workout;
+                    if (this.onWorkoutReceived) {
+                        this.onWorkoutReceived(data.workout);
+                    }
+                }
+
+                if (this.onParticipantUpdate) {
+                    this.onParticipantUpdate(Array.from(this.participants.values()));
+                }
+                break;
+
+            case 'workout-update':
+                // Host updated the workout
+                this.sharedWorkout = data.workout;
+                if (this.onWorkoutReceived) {
+                    this.onWorkoutReceived(data.workout);
+                }
+                break;
+
+            case 'ftp-update':
+                // Participant updated their FTP
+                const ftpParticipant = this.participants.get(data.id);
+                if (ftpParticipant) {
+                    ftpParticipant.ftp = data.ftp;
+
+                    if (this.onParticipantUpdate) {
+                        this.onParticipantUpdate(Array.from(this.participants.values()));
+                    }
+                }
+
+                // If host, relay to other participants
+                if (this.isHost) {
+                    this.broadcast(data, fromPeerId);
                 }
                 break;
 
@@ -227,11 +363,11 @@ class SessionManager {
 
             case 'metrics':
                 // Update participant metrics
-                const participant = this.participants.get(data.id);
-                if (participant) {
-                    participant.power = data.power;
-                    participant.cadence = data.cadence;
-                    participant.progress = data.progress;
+                const metricsParticipant = this.participants.get(data.id);
+                if (metricsParticipant) {
+                    metricsParticipant.power = data.power;
+                    metricsParticipant.cadence = data.cadence;
+                    metricsParticipant.progress = data.progress;
 
                     if (this.onParticipantUpdate) {
                         this.onParticipantUpdate(Array.from(this.participants.values()));
@@ -314,6 +450,40 @@ class SessionManager {
         }
     }
 
+    // Share workout with all participants (host only)
+    shareWorkout(workout) {
+        if (!this.isHost) return;
+
+        this.sharedWorkout = workout;
+
+        this.broadcast({
+            type: 'workout-update',
+            workout
+        });
+    }
+
+    // Update own FTP and broadcast to others
+    updateFTP(ftp) {
+        if (!this.peer || !this.peer.id) return;
+
+        // Update own participant data
+        const self = this.participants.get(this.peer.id);
+        if (self) {
+            self.ftp = ftp;
+        }
+
+        // Broadcast to all participants
+        this.broadcast({
+            type: 'ftp-update',
+            id: this.peer.id,
+            ftp
+        });
+
+        if (this.onParticipantUpdate) {
+            this.onParticipantUpdate(Array.from(this.participants.values()));
+        }
+    }
+
     // Broadcast message to all connections (except exclude)
     broadcast(message, excludePeerId = null) {
         this.connections.forEach((conn, peerId) => {
@@ -347,6 +517,10 @@ class SessionManager {
         this.participants.clear();
         this.sessionId = null;
         this.isHost = false;
+        this.userName = null;
+
+        // Clear persisted session state
+        this.clearSessionState();
     }
 
     // Get session info for sharing
@@ -355,8 +529,7 @@ class SessionManager {
 
         return {
             sessionId: this.sessionId,
-            peerId: this.peer.id,
-            url: `${window.location.origin}${window.location.pathname}?session=${this.sessionId}&host=${this.peer.id}`
+            peerId: this.peer.id
         };
     }
 }

@@ -14,6 +14,7 @@ class FTMSController {
     get FITNESS_MACHINE_CONTROL_POINT() { return 0x2AD9; }
     get FITNESS_MACHINE_STATUS() { return 0x2ADA; }
     get CYCLING_POWER_SERVICE() { return 0x1818; }
+    get CYCLING_SPEED_CADENCE_SERVICE() { return 0x1816; }
     get HEART_RATE_SERVICE() { return 0x180d; }
     get DEVICE_INFO_SERVICE() { return 0x180a; }
 
@@ -21,6 +22,23 @@ class FTMSController {
         if (this.onLog) {
             this.onLog(msg, type);
         }
+    }
+
+    // Identify trainer brand from device name
+    getTrainerBrand(deviceName) {
+        const name = deviceName.toUpperCase();
+
+        if (name.includes('ZWIFT')) return 'Zwift';
+        if (name.includes('KICKR') || name.includes('WAHOO')) return 'Wahoo';
+        if (name.includes('TACX') || name.includes('NEO') || name.includes('FLUX')) return 'Tacx';
+        if (name.includes('ELITE') || name.includes('DRIVO') || name.includes('DIRETO') || name.includes('SUITO')) return 'Elite';
+        if (name.includes('SARIS') || name.includes('H3') || name.includes('H2')) return 'Saris';
+        if (name.includes('JETBLACK') || name.includes('VOLT')) return 'JetBlack';
+        if (name.includes('KINETIC')) return 'Kinetic';
+        if (name.includes('BKOOL')) return 'Bkool';
+        if (name.includes('WATTBIKE') || name.includes('ATOM')) return 'Wattbike';
+
+        return 'Unknown';
     }
 
     async connect() {
@@ -32,12 +50,45 @@ class FTMSController {
                 return false;
             }
 
-            this.log('Scanning for Zwift Hub...', 'info');
+            this.log('Scanning for smart trainers...', 'info');
+
+            // Support popular smart trainers via FTMS
             this.device = await navigator.bluetooth.requestDevice({
-                filters: [{ namePrefix: 'Zwift' }],
+                filters: [
+                    // Zwift trainers
+                    { namePrefix: 'Zwift' },
+                    // Wahoo trainers
+                    { namePrefix: 'KICKR' },
+                    { namePrefix: 'Wahoo' },
+                    // Tacx trainers
+                    { namePrefix: 'Tacx' },
+                    { namePrefix: 'NEO' },
+                    { namePrefix: 'Flux' },
+                    // Elite trainers
+                    { namePrefix: 'Elite' },
+                    { namePrefix: 'DRIVO' },
+                    { namePrefix: 'DIRETO' },
+                    { namePrefix: 'SUITO' },
+                    // Saris trainers
+                    { namePrefix: 'Saris' },
+                    { namePrefix: 'H3' },
+                    { namePrefix: 'H2' },
+                    // JetBlack trainers
+                    { namePrefix: 'JetBlack' },
+                    { namePrefix: 'VOLT' },
+                    // Kinetic trainers
+                    { namePrefix: 'Kinetic' },
+                    { namePrefix: 'ROCK AND ROLL' },
+                    // Bkool trainers
+                    { namePrefix: 'BKOOL' },
+                    // Wattbike
+                    { namePrefix: 'WATTBIKE' },
+                    { namePrefix: 'Atom' }
+                ],
                 optionalServices: [
                     this.FITNESS_MACHINE_SERVICE,
                     this.CYCLING_POWER_SERVICE,
+                    this.CYCLING_SPEED_CADENCE_SERVICE,
                     this.HEART_RATE_SERVICE,
                     this.DEVICE_INFO_SERVICE
                 ]
@@ -60,6 +111,168 @@ class FTMSController {
     }
 
     async subscribeToMetrics() {
+        // Try to subscribe to FTMS Indoor Bike Data first (most common for cadence)
+        try {
+            const ftmsService = await this.server.getPrimaryService(this.FITNESS_MACHINE_SERVICE);
+            const indoorBikeChar = await ftmsService.getCharacteristic(0x2AD2); // Indoor Bike Data
+
+            indoorBikeChar.addEventListener('characteristicvaluechanged', (e) => {
+                try {
+                    const dv = new DataView(e.target.value.buffer);
+                    const flags = dv.getUint16(0, true);
+
+                    let offset = 2;
+
+                    // Instantaneous Speed Present (bit 0)
+                    if (flags & 0x01) {
+                        offset += 2; // Skip speed
+                    }
+
+                    // Average Speed Present (bit 1)
+                    if (flags & 0x02) {
+                        offset += 2; // Skip average speed
+                    }
+
+                    // Instantaneous Cadence Present (bit 2)
+                    if (flags & 0x04) {
+                        // NOTE: This field doesn't seem to be real cadence on Zwift Hub, ignoring it
+                        // Will use Cycling Power Service crank revolutions instead
+                        offset += 2;
+                    }
+
+                    // Average Cadence Present (bit 3)
+                    if (flags & 0x08) {
+                        offset += 2;
+                    }
+
+                    // Total Distance Present (bit 4)
+                    if (flags & 0x10) {
+                        offset += 3; // 24-bit field
+                    }
+
+                    // Resistance Level Present (bit 5)
+                    if (flags & 0x20) {
+                        offset += 2; // Skip resistance
+                    }
+
+                    // Instantaneous Power Present (bit 6)
+                    if (flags & 0x40) {
+                        // NOTE: Power from Indoor Bike Data seems incorrect (stuck at 20W)
+                        // Using Cycling Power Service instead
+                        offset += 2;
+                    }
+
+                    // Average Power Present (bit 7)
+                    if (flags & 0x80) {
+                        offset += 2;
+                    }
+
+                    // Extended Energy fields (bits 8-11)
+                    if (flags & 0x100) { // Total Energy
+                        offset += 2;
+                    }
+                    if (flags & 0x200) { // Energy Per Hour
+                        offset += 2;
+                    }
+                    if (flags & 0x400) { // Energy Per Minute
+                        offset += 1;
+                    }
+                    if (flags & 0x800) { // Heart Rate
+                        const hr = dv.getUint8(offset);
+                        if (hr > 0) {
+                            this.metrics.hr = hr;
+                        }
+                        offset += 1;
+                    }
+
+                    this.metrics.timestamp = Date.now();
+                    if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);
+                } catch (err) {
+                    console.error('Indoor Bike Data parse error:', err);
+                }
+            });
+
+            await indoorBikeChar.startNotifications();
+            this.log('Subscribed to Indoor Bike Data (cadence, power)', 'success');
+        } catch (e) {
+            this.log(`Indoor Bike Data: ${e.message}`, 'warning');
+        }
+
+        // Subscribe to Cycling Speed and Cadence Service (for cadence)
+        try {
+            this.log('Attempting to connect to CSC Service...', 'info');
+            const cscService = await this.server.getPrimaryService(this.CYCLING_SPEED_CADENCE_SERVICE);
+            this.log('Found CSC Service, getting characteristic...', 'info');
+            const cscChar = await cscService.getCharacteristic(0x2A5B); // CSC Measurement
+            this.log('Found CSC Measurement characteristic', 'info');
+
+            cscChar.addEventListener('characteristicvaluechanged', (e) => {
+                try {
+                    const dv = new DataView(e.target.value.buffer);
+                    const flags = dv.getUint8(0);
+
+                    const bytes = new Uint8Array(e.target.value.buffer);
+                    const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    console.log('CSC Measurement:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(2, '0'));
+
+                    let offset = 1;
+
+                    // Wheel Revolution Data Present (bit 0)
+                    if (flags & 0x01) {
+                        offset += 6; // Skip wheel data (4 bytes revs + 2 bytes time)
+                    }
+
+                    // Crank Revolution Data Present (bit 1)
+                    if (flags & 0x02) {
+                        const cumulativeCrankRevs = dv.getUint16(offset, true);
+                        const lastCrankEventTime = dv.getUint16(offset + 2, true); // in 1/1024 seconds
+
+                        console.log('CSC Crank revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime);
+
+                        // Calculate cadence from deltas
+                        if (this.lastCSCCrankRevs !== undefined && this.lastCSCCrankTime !== undefined) {
+                            const revDelta = (cumulativeCrankRevs - this.lastCSCCrankRevs) & 0xFFFF;
+                            const timeDelta = ((lastCrankEventTime - this.lastCSCCrankTime) & 0xFFFF) / 1024.0;
+
+                            console.log('CSC Delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
+
+                            if (timeDelta > 0 && revDelta > 0 && revDelta < 20) {
+                                // Zwift Hub counts both pedal strokes, so divide by 2 for actual cadence
+                                const cadence = Math.round((revDelta / timeDelta) * 60 / 2); // RPM
+                                this.metrics.cadence = cadence;
+                                console.log('Cadence from CSC:', cadence, 'RPM (raw:', Math.round((revDelta / timeDelta) * 60), ')');
+
+                                // Store last valid cadence and timestamp for timeout detection
+                                this.lastValidCadence = cadence;
+                                this.lastValidCadenceTime = Date.now();
+                            } else if (timeDelta === 0 && revDelta === 0) {
+                                // Duplicate packet - keep current cadence but check for timeout
+                                if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
+                                    // No new data for 2 seconds, user stopped pedaling
+                                    this.metrics.cadence = 0;
+                                }
+                                // Otherwise keep the last valid cadence
+                            }
+                        }
+
+                        this.lastCSCCrankRevs = cumulativeCrankRevs;
+                        this.lastCSCCrankTime = lastCrankEventTime;
+                    }
+
+                    this.metrics.timestamp = Date.now();
+                    if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);
+                } catch (err) {
+                    console.error('CSC Measurement parse error:', err);
+                }
+            });
+
+            await cscChar.startNotifications();
+            this.log('Subscribed to Cycling Speed and Cadence (cadence)', 'success');
+        } catch (e) {
+            this.log(`Cycling Speed and Cadence: ${e.message}`, 'warning');
+        }
+
+        // Subscribe to Heart Rate
         try {
             const hrService = await this.server.getPrimaryService(this.HEART_RATE_SERVICE);
             const hrChar = await hrService.getCharacteristic(0x2a37);
@@ -70,8 +283,12 @@ class FTMSController {
                 if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);
             });
             await hrChar.startNotifications();
-        } catch (e) { }
+            this.log('Subscribed to Heart Rate', 'success');
+        } catch (e) {
+            this.log(`Heart Rate: ${e.message}`, 'warning');
+        }
 
+        // Also try Cycling Power Service as fallback (for cadence from crank revolutions)
         try {
             const cpService = await this.server.getPrimaryService(this.CYCLING_POWER_SERVICE);
             const cpChar = await cpService.getCharacteristic(0x2a63);
@@ -80,28 +297,59 @@ class FTMSController {
                     const dv = new DataView(e.target.value.buffer);
                     const flags = dv.getUint16(0, true);
 
+                    // Debug: log raw bytes
+                    const bytes = new Uint8Array(e.target.value.buffer);
+                    const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    console.log('Cycling Power:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(4, '0'));
+
                     // Power is always at offset 2
-                    this.metrics.power = dv.getInt16(2, true);
+                    const power = dv.getInt16(2, true);
+                    console.log('Power from Cycling Power Service at offset 2:', power, 'W');
+
+                    // Use Cycling Power Service as primary source for power
+                    this.metrics.power = power;
 
                     // Check if Crank Revolution Data Present (bit 5 = 0x20)
                     let offset = 4;
                     if (flags & 0x20) {
                         // Crank revolution data present
-                        const cumulativeCrankRevs = dv.getUint16(offset, true);
-                        const lastCrankEventTime = dv.getUint16(offset + 2, true); // in 1/1024 seconds
+                        // Zwift Hub uses 32-bit cumulative crank revolutions (non-standard)
+                        const cumulativeCrankRevs = dv.getUint32(offset, true);
+                        const lastCrankEventTime = dv.getUint16(offset + 4, true); // in 1/1024 seconds
 
                         // Calculate cadence from deltas (if we have previous values)
-                        if (this.lastCrankRevs !== undefined) {
-                            const revDelta = (cumulativeCrankRevs - this.lastCrankRevs) & 0xFFFF;
+                        if (this.lastCrankRevs !== undefined && this.lastCrankTime !== undefined) {
+                            const revDelta = cumulativeCrankRevs - this.lastCrankRevs;
                             const timeDelta = ((lastCrankEventTime - this.lastCrankTime) & 0xFFFF) / 1024.0; // seconds
 
-                            if (timeDelta > 0 && revDelta < 10) { // sanity check
-                                this.metrics.cadence = Math.round((revDelta / timeDelta) * 60); // RPM
+                            console.log('CP Crank data - revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime,
+                                        'delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
+
+                            if (timeDelta > 0 && revDelta > 0 && revDelta < 20) { // sanity check (increased limit since we're getting 2x)
+                                // Zwift Hub counts both pedal strokes, so divide by 2 for actual cadence
+                                const cadence = Math.round((revDelta / timeDelta) * 60 / 2); // RPM
+                                this.metrics.cadence = cadence;
+                                console.log('Cadence from Cycling Power:', cadence, 'RPM (raw:', Math.round((revDelta / timeDelta) * 60), ')');
+
+                                this.lastValidCadence = cadence;
+                                this.lastValidCadenceTime = Date.now();
+                            } else if (timeDelta === 0 && revDelta === 0) {
+                                // Duplicate - keep cadence but check timeout
+                                if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
+                                    this.metrics.cadence = 0;
+                                }
                             }
                         }
 
                         this.lastCrankRevs = cumulativeCrankRevs;
                         this.lastCrankTime = lastCrankEventTime;
+
+                        offset += 6; // Skip past crank data
+                    } else {
+                        // No crank data in this packet
+                        if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
+                            this.metrics.cadence = 0;
+                        }
                     }
 
                     this.metrics.timestamp = Date.now();
@@ -111,9 +359,9 @@ class FTMSController {
                 }
             });
             await cpChar.startNotifications();
-            this.log('Subscribed to metrics', 'success');
+            this.log('Subscribed to Cycling Power Service', 'success');
         } catch (e) {
-            this.log(`Metrics subscription: ${e.message}`, 'warning');
+            this.log(`Cycling Power Service: ${e.message}`, 'warning');
         }
     }
 

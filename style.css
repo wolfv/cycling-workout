@@ -866,6 +866,166 @@ input[type="number"]:focus {
     margin-bottom: 0.5rem;
 }
 
+/* Workout Participants Section */
+#workoutParticipantsSection {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-primary);
+}
+
+.workout-participants-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.workout-participants-header i {
+    width: 16px;
+    height: 16px;
+}
+
+.workout-participants-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.workout-participant-compact {
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.workout-participant-compact.host {
+    border-left: 3px solid #fbbf24;
+}
+
+.workout-participant-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.host-badge-mini {
+    display: inline-block;
+    padding: 0.0625rem 0.375rem;
+    background: #fbbf24;
+    color: #000;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+}
+
+.workout-participant-stats {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.stat-compact {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.stat-compact i {
+    width: 12px;
+    height: 12px;
+}
+
+.ftp-mini {
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+}
+
+/* Workout Summary */
+.workout-summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-stat {
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    text-align: center;
+}
+
+.summary-stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.summary-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.workout-summary-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.workout-summary-help {
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+}
+
+.workout-summary-help p {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.workout-summary-help ol {
+    margin: 0.5rem 0 0.5rem 1.5rem;
+    padding: 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.workout-summary-help li {
+    margin-bottom: 0.25rem;
+}
+
+.workout-summary-help a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.workout-summary-help a:hover {
+    text-decoration: underline;
+}
+
 /* Session Container */
 .session-container {
     max-width: 1400px;
@@ -1033,6 +1193,18 @@ input[type="number"]:focus {
     font-weight: 700;
     border-radius: 4px;
     letter-spacing: 0.05em;
+}
+
+.ftp-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    font-size: 0.625rem;
+    font-weight: 600;
+    border-radius: 4px;
+    border: 1px solid var(--border-primary);
+    margin-left: 0.5rem;
 }
 
 .participant-metrics {

@@ -1,6 +1,6 @@
-# Zwift Hub Controller
+# Smart Trainer Controller
 
-A professional, dark-themed dashboard for controlling your Zwift Hub trainer using the FTMS (Fitness Machine Service) protocol via Web Bluetooth.
+A professional, dark-themed dashboard for controlling smart trainers using the FTMS (Fitness Machine Service) protocol via Web Bluetooth. Supports Zwift Hub, Wahoo KICKR, Tacx NEO, Elite, and many more!
 
 🌐 **[Try it live!](https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/)** (Replace with your GitHub Pages URL after deployment)
 
@@ -47,6 +47,56 @@ A professional, dark-themed dashboard for controlling your Zwift Hub trainer usi
 - Instant power adjustment
 - Connection management
 
+### 👥 Collaborative Sessions
+- **Ride with friends** in real-time using peer-to-peer connections
+- **Workout sharing** - host sends workout to all participants
+- **Individual FTP scaling** - everyone rides at their own intensity
+- **Live race track** - see everyone's position on the workout timeline
+- **Real-time metrics** - view power, cadence, and FTP for all riders
+- **Session persistence** - survives page refreshes
+- **Google Meet integration** - video chat while riding
+- **Synchronized start** - countdown ensures everyone starts together
+
+## Supported Devices
+
+This app works with **any smart trainer that supports FTMS (Fitness Machine Service)** via Bluetooth. Tested and confirmed with:
+
+### ✅ Zwift
+- Zwift Hub
+- Zwift Hub One
+
+### ✅ Wahoo
+- KICKR (all generations)
+- KICKR CORE
+- KICKR SNAP
+- KICKR BIKE
+
+### ✅ Tacx
+- Tacx NEO (Smart, 2T, 2T Plus, 3M)
+- Tacx Flux (S, 2)
+- Tacx Genius
+- Other Tacx FTMS trainers
+
+### ✅ Elite
+- Elite DRIVO (I, II)
+- Elite DIRETO (X, XR, XR-T)
+- Elite SUITO (T)
+- Elite JUSTO
+- Other Elite FTMS trainers
+
+### ✅ Saris
+- Saris H3
+- Saris H2 (with FTMS firmware)
+- Saris M2
+
+### ✅ Other Brands
+- JetBlack VOLT
+- Kinetic ROCK AND ROLL
+- Bkool trainers
+- Wattbike Atom
+
+**Note:** Your trainer must support FTMS protocol. Most modern smart trainers (2017+) support this standard.
+
 ## Getting Started
 
 ### Option 1: Use GitHub Pages (Recommended)
@@ -55,7 +105,7 @@ The app is automatically deployed to GitHub Pages via GitHub Actions.
 ### Option 2: Local Development
 1. Open `index.html` in a modern browser (Chrome, Edge, or Opera)
 2. Ensure you're using HTTPS or localhost (Web Bluetooth requirement)
-3. Click **Connect** to pair with your Zwift Hub
+3. Click **Connect** to pair with your smart trainer
 4. Set your FTP in the workout designer
 5. Start designing and riding!
 
