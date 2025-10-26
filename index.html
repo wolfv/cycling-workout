@@ -80,18 +80,18 @@
                 <!-- Session Join Bar (when not in session) -->
                 <div id="sessionJoinBar" class="card mb-6">
                     <section>
-                        <div class="flex gap-3 items-center flex-wrap">
-                            <input type="text" id="quickJoinSessionCode" class="input flex-1 min-w-[200px]" placeholder="Paste session code to join friends">
-                            <input type="text" id="quickJoinName" class="input w-[150px]" placeholder="Your name" value="Rider">
-                            <button onclick="app.quickJoinSession()" class="btn">
+                        <form class="form flex gap-3 items-center flex-wrap" onsubmit="app.quickJoinSession(); return false;">
+                            <input type="text" id="quickJoinSessionCode" class="flex-1 min-w-[200px]" placeholder="Paste session code to join friends">
+                            <input type="text" id="quickJoinName" class="w-[150px]" placeholder="Your name" value="Rider">
+                            <button type="submit" class="btn">
                                 <i data-lucide="users"></i>
                                 Join Session
                             </button>
-                            <button onclick="app.quickCreateSession()" class="btn-outline">
+                            <button type="button" onclick="app.quickCreateSession()" class="btn-outline">
                                 <i data-lucide="plus-circle"></i>
                                 Create New
                             </button>
-                        </div>
+                        </form>
                     </section>
                 </div>
 
