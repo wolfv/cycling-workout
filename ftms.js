@@ -7,6 +7,63 @@ class FTMSController {
         this.metrics = { power: 0, hr: 0, cadence: 0, timestamp: Date.now() };
         this.onMetricsUpdate = null;
         this.onLog = null;
+        this.lastDeviceId = null;
+    }
+
+    // Save last connected device to localStorage
+    saveLastDevice() {
+        if (this.device && this.device.id) {
+            const deviceInfo = {
+                id: this.device.id,
+                name: this.device.name
+            };
+            localStorage.setItem('lastBluetoothDevice', JSON.stringify(deviceInfo));
+            this.log(`Saved device: ${this.device.name}`, 'info');
+        }
+    }
+
+    // Get saved device info
+    getLastDevice() {
+        const saved = localStorage.getItem('lastBluetoothDevice');
+        return saved ? JSON.parse(saved) : null;
+    }
+
+    // Try to reconnect to last device
+    async reconnectToLastDevice() {
+        const lastDevice = this.getLastDevice();
+        if (!lastDevice) {
+            return false;
+        }
+
+        try {
+            this.log(`Reconnecting to ${lastDevice.name}...`, 'info');
+
+            // Get all previously paired devices
+            const devices = await navigator.bluetooth.getDevices();
+            const savedDevice = devices.find(d => d.id === lastDevice.id);
+
+            if (!savedDevice) {
+                this.log('Device not found in paired devices', 'warning');
+                return false;
+            }
+
+            // Check if device is in range by trying to connect
+            if (!savedDevice.gatt.connected) {
+                this.device = savedDevice;
+                this.server = await this.device.gatt.connect();
+                this.log(`Reconnected to ${this.device.name}!`, 'success');
+
+                await this.subscribeToMetrics();
+                await this.initializeFTMS();
+
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            this.log(`Reconnection failed: ${error.message}`, 'warning');
+            return false;
+        }
     }
 
     // FTMS (Fitness Machine Service) UUIDs
@@ -100,6 +157,9 @@ class FTMSController {
 
             await this.subscribeToMetrics();
             await this.initializeFTMS();
+
+            // Save device for auto-reconnect
+            this.saveLastDevice();
 
             return true;
         } catch (error) {

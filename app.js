@@ -39,6 +39,82 @@ class App {
 
         // Attempt to restore session from localStorage
         this.attemptSessionRestore();
+
+        // Load saved rider name or generate a fun one
+        this.loadRiderName();
+
+        // Auto-reconnect to last Bluetooth device
+        this.attemptBluetoothReconnect();
+    }
+
+    // Generate a fun random rider name
+    generateRiderName() {
+        const adjectives = [
+            'Speedy', 'Turbo', 'Lightning', 'Thunder', 'Cosmic', 'Blazing', 'Swift',
+            'Mighty', 'Epic', 'Legendary', 'Rapid', 'Flying', 'Soaring', 'Crushing',
+            'Wild', 'Fierce', 'Bold', 'Brave', 'Golden', 'Silver', 'Iron', 'Steel'
+        ];
+
+        const nouns = [
+            'Cyclone', 'Tornado', 'Hurricane', 'Storm', 'Thunder', 'Lightning', 'Bolt',
+            'Rider', 'Racer', 'Sprinter', 'Climber', 'Champion', 'Legend', 'Hero',
+            'Falcon', 'Eagle', 'Hawk', 'Cheetah', 'Panther', 'Tiger', 'Lion', 'Dragon'
+        ];
+
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        const number = Math.floor(Math.random() * 100);
+
+        return `${adj} ${noun} ${number}`;
+    }
+
+    // Load saved rider name or generate new one
+    loadRiderName() {
+        let riderName = localStorage.getItem('riderName');
+
+        if (!riderName) {
+            riderName = this.generateRiderName();
+            localStorage.setItem('riderName', riderName);
+        }
+
+        // Set in all input fields
+        document.getElementById('quickJoinName').value = riderName;
+        const hostNameInput = document.getElementById('hostNameInput');
+        if (hostNameInput) hostNameInput.value = riderName;
+        const joinNameInput = document.getElementById('joinNameInput');
+        if (joinNameInput) joinNameInput.value = riderName;
+    }
+
+    // Save rider name when changed
+    saveRiderName(name) {
+        if (name && name.trim()) {
+            localStorage.setItem('riderName', name.trim());
+        }
+    }
+
+    // Auto-reconnect to last Bluetooth device
+    async attemptBluetoothReconnect() {
+        const lastDevice = this.ftms.getLastDevice();
+        if (!lastDevice) {
+            return;
+        }
+
+        // Check if bluetooth.getDevices() is available
+        if (!navigator.bluetooth.getDevices) {
+            this.log('Auto-reconnect not supported in this browser', 'info');
+            return;
+        }
+
+        this.log(`Found previously connected device: ${lastDevice.name}`, 'info');
+
+        // Add small delay to let page fully load
+        setTimeout(async () => {
+            const connected = await this.ftms.reconnectToLastDevice();
+            if (connected) {
+                this.updateConnectionStatus(true);
+                this.startMetricsBroadcast();
+            }
+        }, 1000);
     }
 
     async attemptSessionRestore() {
@@ -503,7 +579,10 @@ class App {
     }
 
     async quickCreateSession() {
-        const userName = document.getElementById('quickJoinName').value.trim() || 'Rider';
+        const userName = document.getElementById('quickJoinName').value.trim() || this.generateRiderName();
+        // Save the name for next time
+        this.saveRiderName(userName);
+
         try {
             const result = await this.sessionManager.createSession(userName);
             this.log(`Session created: ${result.sessionId}`, 'success');
@@ -515,8 +594,11 @@ class App {
     }
 
     async quickJoinSession() {
-        const userName = document.getElementById('quickJoinName').value.trim() || 'Rider';
+        const userName = document.getElementById('quickJoinName').value.trim() || this.generateRiderName();
         const sessionCode = document.getElementById('quickJoinSessionCode').value.trim();
+
+        // Save the name for next time
+        this.saveRiderName(userName);
 
         if (!sessionCode) {
             alert('Please enter a session code');
