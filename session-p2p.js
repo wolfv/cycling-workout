@@ -395,12 +395,39 @@ class P2PSessionManager {
     }
 
     generateSessionCode() {
-        const adjectives = ['swift', 'power', 'turbo', 'epic', 'mega', 'super', 'ultra', 'hyper'];
-        const nouns = ['rider', 'cycler', 'racer', 'pedal', 'wheel', 'chain', 'sprint', 'climb'];
+        // Generate memorable but secure session code
+        // Format: adjective-noun-verb-animal (e.g., "swift-mountain-climbing-falcon")
+        // ~1.5 million combinations - secure enough for temporary sessions
+
+        const adjectives = [
+            'swift', 'strong', 'brave', 'mighty', 'rapid', 'blazing', 'fierce', 'bold',
+            'turbo', 'power', 'epic', 'mega', 'super', 'ultra', 'stellar', 'cosmic',
+            'thunder', 'lightning', 'storm', 'wild', 'golden', 'silver', 'crimson', 'azure'
+        ];
+
+        const nouns = [
+            'mountain', 'valley', 'river', 'peak', 'summit', 'ridge', 'canyon', 'plateau',
+            'rider', 'cycler', 'racer', 'climber', 'sprinter', 'champion', 'legend', 'hero',
+            'wheel', 'pedal', 'chain', 'spoke', 'saddle', 'handle', 'frame', 'gear'
+        ];
+
+        const verbs = [
+            'riding', 'climbing', 'sprinting', 'racing', 'crushing', 'dominating', 'flying', 'soaring',
+            'blazing', 'rolling', 'spinning', 'pushing', 'grinding', 'attacking', 'charging', 'surging'
+        ];
+
+        const animals = [
+            'falcon', 'eagle', 'hawk', 'cheetah', 'leopard', 'jaguar', 'panther', 'tiger',
+            'lion', 'wolf', 'bear', 'shark', 'dragon', 'phoenix', 'griffin', 'mustang',
+            'stallion', 'gazelle', 'cobra', 'viper', 'raptor', 'condor', 'raven', 'owl'
+        ];
+
         const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
         const noun = nouns[Math.floor(Math.random() * nouns.length)];
-        const num = Math.floor(Math.random() * 100);
-        return `${adj}-${noun}-${num}`;
+        const verb = verbs[Math.floor(Math.random() * verbs.length)];
+        const animal = animals[Math.floor(Math.random() * animals.length)];
+
+        return `${adj}-${noun}-${verb}-${animal}`;
     }
 
     removePeer(peerId) {
