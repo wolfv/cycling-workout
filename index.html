@@ -164,15 +164,15 @@
 
             <!-- Chart -->
             <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
+                <header>
+                    <h2 class="flex items-center gap-2">
                         <i data-lucide="line-chart"></i>
                         <span>Live Data</span>
                     </h2>
-                </div>
-                <div class="card-content">
+                </header>
+                <section>
                     <canvas id="liveChart" width="800" height="300"></canvas>
-                </div>
+                </section>
             </div>
 
             <!-- Active Workout -->
@@ -309,52 +309,54 @@
 
             <!-- Quick Control -->
             <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
+                <header>
+                    <h2 class="flex items-center gap-2">
                         <i data-lucide="sliders"></i>
                         <span>Quick Control</span>
                     </h2>
-                </div>
-                <div class="card-content">
-                    <div class="control-group">
-                        <label class="control-label">Target Power</label>
-                        <div class="power-display" id="powerDisplay">100W</div>
-                        <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.updatePowerDisplay()">
-                        <button onclick="app.setPowerCommand()" id="setPowerBtn" disabled class="btn btn-primary btn-block">
+                </header>
+                <section>
+                    <div class="grid gap-4">
+                        <div class="grid gap-2">
+                            <label for="powerSlider" class="text-sm font-medium">Target Power</label>
+                            <div class="power-display text-3xl font-bold text-center py-2" id="powerDisplay">100W</div>
+                            <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.updatePowerDisplay()" class="w-full">
+                        </div>
+                        <button onclick="app.setPowerCommand()" id="setPowerBtn" disabled class="btn w-full">
                             <i data-lucide="send"></i>
                             <span>Set Power</span>
                         </button>
                     </div>
-                </div>
+                </section>
             </div>
 
             <!-- Workout Control -->
-            <div class="card" id="workoutControlCard" style="display: none;">
-                <div class="card-header">
-                    <h2 class="card-title">
+            <div class="card hidden" id="workoutControlCard">
+                <header>
+                    <h2 class="flex items-center gap-2">
                         <i data-lucide="play-circle"></i>
                         <span>Workout Ready</span>
                     </h2>
-                </div>
-                <div class="card-content">
-                    <button onclick="workoutDesigner.startWorkout()" id="startWorkoutBtn" class="btn btn-primary btn-block btn-lg">
+                </header>
+                <section>
+                    <button onclick="workoutDesigner.startWorkout()" id="startWorkoutBtn" class="btn-lg w-full">
                         <i data-lucide="play"></i>
                         <span>Start Workout</span>
                     </button>
-                </div>
+                </section>
             </div>
 
             <!-- Activity Log -->
             <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
+                <header>
+                    <h2 class="flex items-center gap-2">
                         <i data-lucide="terminal"></i>
                         <span>Activity Log</span>
                     </h2>
-                </div>
-                <div class="card-content">
+                </header>
+                <section>
                     <div class="log" id="log"></div>
-                </div>
+                </section>
             </div>
         </div>
     </div>
