@@ -390,6 +390,7 @@ class SessionManager {
                     metricsParticipant.power = data.power;
                     metricsParticipant.cadence = data.cadence;
                     metricsParticipant.progress = data.progress;
+                    metricsParticipant.heartRate = data.heartRate || 0;
 
                     if (this.onParticipantUpdate) {
                         this.onParticipantUpdate(Array.from(this.participants.values()));
@@ -419,7 +420,7 @@ class SessionManager {
     }
 
     // Broadcast metrics to all participants
-    broadcastMetrics(power, cadence, progress) {
+    broadcastMetrics(power, cadence, progress, heartRate = 0) {
         if (!this.peer || !this.peer.id) return;
 
         const message = {
@@ -427,7 +428,8 @@ class SessionManager {
             id: this.peer.id,
             power,
             cadence,
-            progress
+            progress,
+            heartRate
         };
 
         // Update own participant data
@@ -436,6 +438,7 @@ class SessionManager {
             self.power = power;
             self.cadence = cadence;
             self.progress = progress;
+            self.heartRate = heartRate;
         }
 
         // Broadcast to all connections

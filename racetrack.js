@@ -133,9 +133,20 @@ class RaceTrackVisualizer {
             this.ctx.fillText(participant.name, x, y + 25);
 
             // Draw metrics below name
-            this.ctx.fillStyle = '#a1a1aa';
             this.ctx.font = '10px system-ui, -apple-system, sans-serif';
-            this.ctx.fillText(`${participant.power}W  ${participant.cadence}rpm`, x, y + 37);
+
+            // Power and cadence in gray
+            this.ctx.fillStyle = '#a1a1aa';
+            const metricsText = `${participant.power}W  ${participant.cadence}rpm`;
+            const metricsWidth = this.ctx.measureText(metricsText).width;
+            this.ctx.fillText(metricsText, x - metricsWidth/2 - 15, y + 37);
+
+            // Heart rate with zone color
+            if (participant.heartRate && participant.heartRate > 0) {
+                const hrColor = HRZones.getHRColor(participant.heartRate);
+                this.ctx.fillStyle = hrColor;
+                this.ctx.fillText(`${participant.heartRate}bpm`, x + metricsWidth/2 - 5, y + 37);
+            }
         });
     }
 

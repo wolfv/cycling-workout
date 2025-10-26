@@ -94,7 +94,17 @@ class App {
     handleMetricsUpdate(metrics) {
         // Update UI
         document.getElementById('powerValue').textContent = Math.max(0, metrics.power);
-        document.getElementById('hrValue').textContent = metrics.hr;
+
+        // Update HR with zone color
+        const hrElement = document.getElementById('hrValue');
+        hrElement.textContent = metrics.hr || '--';
+        if (metrics.hr > 0) {
+            const hrColor = HRZones.getHRColor(metrics.hr);
+            hrElement.style.color = hrColor;
+        } else {
+            hrElement.style.color = '';
+        }
+
         document.getElementById('cadenceValue').textContent = metrics.cadence || 0;
         document.getElementById('statusValue').textContent = '✓';
 
@@ -110,7 +120,7 @@ class App {
         // Broadcast to session if connected
         if (this.sessionManager && this.sessionManager.sessionId) {
             const progress = this.calculateWorkoutProgress();
-            this.sessionManager.broadcastMetrics(metrics.power, metrics.cadence || 0, progress);
+            this.sessionManager.broadcastMetrics(metrics.power, metrics.cadence || 0, progress, metrics.hr);
         }
     }
 
@@ -500,7 +510,9 @@ class App {
             if (participants.length === 0) {
                 listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>';
             } else {
-                listEl.innerHTML = participants.map(p => `
+                listEl.innerHTML = participants.map(p => {
+                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                    return `
                     <div class="participant-card ${p.isHost ? 'host' : ''}">
                         <div class="participant-info">
                             <div class="participant-name">
@@ -511,6 +523,7 @@ class App {
                             <div class="participant-metrics">
                                 <span><i data-lucide="zap"></i> ${p.power}W</span>
                                 <span><i data-lucide="gauge"></i> ${p.cadence} rpm</span>
+                                <span><i data-lucide="heart"></i> <span style="color: ${hrColor}">${p.heartRate || '--'}</span></span>
                             </div>
                         </div>
                         <div class="participant-progress">
@@ -519,7 +532,7 @@ class App {
                             </div>
                         </div>
                     </div>
-                `).join('');
+                `;}).join('');
             }
         }
 
@@ -530,7 +543,9 @@ class App {
         if (workoutListEl && workoutSectionEl) {
             if (participants.length > 0) {
                 workoutSectionEl.style.display = 'block';
-                workoutListEl.innerHTML = participants.map(p => `
+                workoutListEl.innerHTML = participants.map(p => {
+                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                    return `
                     <div class="workout-participant-compact ${p.isHost ? 'host' : ''}">
                         <div class="workout-participant-name">
                             ${p.name}
@@ -539,10 +554,11 @@ class App {
                         <div class="workout-participant-stats">
                             <span class="stat-compact"><i data-lucide="zap"></i>${p.power}W</span>
                             <span class="stat-compact"><i data-lucide="gauge"></i>${p.cadence}rpm</span>
+                            <span class="stat-compact"><i data-lucide="heart"></i><span style="color: ${hrColor}">${p.heartRate || '--'}</span></span>
                             <span class="stat-compact ftp-mini">${p.ftp}W FTP</span>
                         </div>
                     </div>
-                `).join('');
+                `;}).join('');
             } else {
                 workoutSectionEl.style.display = 'none';
             }
