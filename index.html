@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zwift Hub Controller</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/basecoat.cdn.min.css">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/js/all.min.js" defer></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -51,8 +53,46 @@
     <!-- Ride Tab -->
     <div class="tab-content active" id="content-ride">
         <div class="dashboard">
-            <!-- Left Column -->
+            <!-- Main Content -->
             <div class="dashboard-main">
+                <!-- Session Join Bar (when not in session) -->
+                <div id="sessionJoinBar" class="card" style="margin-bottom: 1.5rem;">
+                    <section style="padding: 1rem;">
+                        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="quickJoinSessionCode" placeholder="Paste session code to join friends" style="flex: 1; min-width: 200px; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--background);">
+                            <input type="text" id="quickJoinName" placeholder="Your name" value="Rider" style="width: 150px; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--background);">
+                            <button onclick="app.quickJoinSession()" class="btn">
+                                <i data-lucide="users"></i>
+                                Join Session
+                            </button>
+                            <button onclick="app.quickCreateSession()" class="btn-outline">
+                                <i data-lucide="plus-circle"></i>
+                                Create New
+                            </button>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Session Info Bar (when in session) -->
+                <div id="sessionInfoBar" class="card" style="margin-bottom: 1.5rem; display: none;">
+                    <section style="padding: 1rem;">
+                        <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                                <span class="badge"><i data-lucide="users" style="width: 14px; height: 14px;"></i> Connected</span>
+                                <span style="font-weight: 500;">Session:</span>
+                                <code id="sessionCodeQuick" style="background: var(--muted); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;">---</code>
+                                <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
+                                    <i data-lucide="copy"></i>
+                                </button>
+                            </div>
+                            <button onclick="app.disconnectSession()" class="btn-sm-destructive">
+                                <i data-lucide="log-out"></i>
+                                Leave Session
+                            </button>
+                        </div>
+                    </section>
+                </div>
+
                 <!-- Metrics -->
                 <div class="metrics-grid">
                 <div class="metric-card">
@@ -221,6 +261,24 @@
 
         <!-- Right Sidebar -->
         <div class="dashboard-sidebar">
+            <!-- Riders (when in session) -->
+            <div class="card" id="ridersCard" style="display: none;">
+                <header>
+                    <h2><i data-lucide="users"></i> Riders</h2>
+                </header>
+                <section style="padding: 0;">
+                    <div id="ridersListSidebar" class="riders-list">
+                        <!-- Riders will be rendered here -->
+                    </div>
+                </section>
+                <footer id="hostWorkoutControls" style="display: none;">
+                    <button onclick="app.startSyncedWorkout()" id="quickStartSyncedBtn" class="btn w-full">
+                        <i data-lucide="play"></i>
+                        Start for Everyone
+                    </button>
+                </footer>
+            </div>
+
             <!-- Quick Control -->
             <div class="card">
                 <div class="card-header">

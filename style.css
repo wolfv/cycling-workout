@@ -1322,3 +1322,31 @@ input[type="number"]:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* Riders List */
+.riders-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.riders-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.riders-list::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.riders-list::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 3px;
+}
+
+.riders-list::-webkit-scrollbar-thumb:hover {
+    background: var(--border-secondary);
+}
+
+/* Utility classes for Basecoat */
+.w-full {
+    width: 100%;
+}

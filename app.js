@@ -477,17 +477,92 @@ class App {
             this.sessionManager.disconnect();
             this.log('Left session', 'warning');
 
-            // Update UI
+            // Update main UI
+            document.getElementById('sessionJoinBar').style.display = 'block';
+            document.getElementById('sessionInfoBar').style.display = 'none';
+            document.getElementById('ridersCard').style.display = 'none';
+            document.getElementById('hostWorkoutControls').style.display = 'none';
+
+            // Update old session tab UI
             document.getElementById('sessionNotConnected').style.display = 'block';
             document.getElementById('sessionConnected').style.display = 'none';
             document.getElementById('sessionHostControls').style.display = 'none';
             document.getElementById('participantsList').innerHTML = '';
+
+            // Clear inputs
+            document.getElementById('quickJoinSessionCode').value = '';
 
             // Clear race track
             this.raceTrack.clear();
 
             setTimeout(() => lucide.createIcons(), 0);
         }
+    }
+
+    async quickCreateSession() {
+        const userName = document.getElementById('quickJoinName').value.trim() || 'Rider';
+        try {
+            const result = await this.sessionManager.createSession(userName);
+            this.log(`Session created: ${result.sessionId}`, 'success');
+            this.updateSessionUI(result.sessionId, true);
+        } catch (err) {
+            console.error('quickCreateSession error:', err);
+            alert('Failed to create session: ' + err.message);
+        }
+    }
+
+    async quickJoinSession() {
+        const userName = document.getElementById('quickJoinName').value.trim() || 'Rider';
+        const sessionCode = document.getElementById('quickJoinSessionCode').value.trim();
+
+        if (!sessionCode) {
+            alert('Please enter a session code');
+            return;
+        }
+
+        try {
+            const result = await this.sessionManager.joinSession(sessionCode, userName);
+            this.log(`Joined session: ${result.sessionId}`, 'success');
+            this.updateSessionUI(result.sessionId, false);
+        } catch (err) {
+            alert('Failed to join session: ' + err.message);
+            console.error(err);
+        }
+    }
+
+    updateSessionUI(sessionId, isHost) {
+        // Hide join bar, show info bar
+        document.getElementById('sessionJoinBar').style.display = 'none';
+        document.getElementById('sessionInfoBar').style.display = 'block';
+        document.getElementById('sessionCodeQuick').textContent = sessionId;
+
+        // Show riders card
+        document.getElementById('ridersCard').style.display = 'block';
+
+        // Show host controls if host
+        if (isHost) {
+            document.getElementById('hostWorkoutControls').style.display = 'block';
+        }
+
+        // Update old session tab UI as well
+        document.getElementById('sessionNotConnected').style.display = 'none';
+        document.getElementById('sessionConnected').style.display = 'block';
+        document.getElementById('sessionCodeDisplay').textContent = sessionId;
+        if (isHost) {
+            document.getElementById('sessionHostControls').style.display = 'block';
+        }
+
+        // Set FTP
+        const ftp = window.workoutDesigner.ftp;
+        document.getElementById('sessionFtpInput').value = ftp;
+        this.sessionManager.updateFTP(ftp);
+
+        // Setup race track
+        if (window.workoutDesigner.intervals.length > 0) {
+            this.raceTrack.setWorkout(window.workoutDesigner.intervals, ftp);
+        }
+
+        setTimeout(() => lucide.createIcons(), 100);
     }
 
     copySessionInfo() {
@@ -561,6 +636,34 @@ class App {
                 `;}).join('');
             } else {
                 workoutSectionEl.style.display = 'none';
+            }
+        }
+
+        // Update sidebar riders list
+        const sidebarListEl = document.getElementById('ridersListSidebar');
+        if (sidebarListEl) {
+            if (participants.length === 0) {
+                sidebarListEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No riders</div>';
+            } else {
+                sidebarListEl.innerHTML = participants.map(p => {
+                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                    return `
+                    <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                            <div style="font-weight: 500;">
+                                ${p.name}
+                                ${p.isHost ? '<span class="badge-secondary" style="font-size: 0.7rem; margin-left: 0.25rem;">HOST</span>' : ''}
+                            </div>
+                            <span style="font-size: 0.75rem; color: var(--muted-foreground);">${p.ftp}W</span>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; font-size: 0.875rem; color: var(--muted-foreground);">
+                            <span><i data-lucide="zap" style="width: 14px; height: 14px;"></i> ${p.power}W</span>
+                            <span><i data-lucide="gauge" style="width: 14px; height: 14px;"></i> ${p.cadence}</span>
+                            <span><i data-lucide="heart" style="width: 14px; height: 14px;"></i> <span style="color: ${hrColor}">${p.heartRate || '--'}</span></span>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
             }
         }
 
