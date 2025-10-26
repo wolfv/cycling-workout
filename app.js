@@ -19,7 +19,7 @@ class App {
         window.workoutDesigner.onWorkoutStop = () => this.handleWorkoutStop();
 
         // Initialize session manager
-        this.sessionManager = new SessionManager();
+        this.sessionManager = new P2PSessionManager();
         this.sessionManager.onParticipantUpdate = (participants) => this.handleParticipantUpdate(participants);
         this.sessionManager.onSessionStart = (startTime) => this.handleSessionStart(startTime);
         this.sessionManager.onSessionEnd = () => this.handleSessionEnd();

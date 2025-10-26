@@ -1,0 +1,22 @@
+{
+  "name": "zwift-signaling",
+  "version": "1.0.0",
+  "description": "WebRTC signaling server for Zwift Hub workout sessions",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "webrtc",
+    "signaling",
+    "zwift",
+    "cycling"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.45.0"
+  }
+}
