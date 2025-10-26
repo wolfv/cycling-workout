@@ -480,11 +480,11 @@ class App {
             this.sessionManager.disconnect();
             this.log('Left session', 'warning');
 
-            // Update main UI
-            document.getElementById('sessionJoinBar').style.display = 'block';
-            document.getElementById('sessionInfoBar').style.display = 'none';
-            document.getElementById('ridersCard').style.display = 'none';
-            document.getElementById('hostWorkoutControls').style.display = 'none';
+            // Update main UI (using Tailwind classes)
+            document.getElementById('sessionJoinBar').classList.remove('hidden');
+            document.getElementById('sessionInfoBar').classList.add('hidden');
+            document.getElementById('ridersCard').classList.add('hidden');
+            document.getElementById('hostWorkoutControls').classList.add('hidden');
 
             // Update old session tab UI
             document.getElementById('sessionNotConnected').style.display = 'block';
@@ -534,17 +534,17 @@ class App {
     }
 
     updateSessionUI(sessionId, isHost) {
-        // Hide join bar, show info bar
-        document.getElementById('sessionJoinBar').style.display = 'none';
-        document.getElementById('sessionInfoBar').style.display = 'block';
+        // Hide join bar, show info bar (using Tailwind classes)
+        document.getElementById('sessionJoinBar').classList.add('hidden');
+        document.getElementById('sessionInfoBar').classList.remove('hidden');
         document.getElementById('sessionCodeQuick').textContent = sessionId;
 
         // Show riders card
-        document.getElementById('ridersCard').style.display = 'block';
+        document.getElementById('ridersCard').classList.remove('hidden');
 
         // Show host controls if host
         if (isHost) {
-            document.getElementById('hostWorkoutControls').style.display = 'block';
+            document.getElementById('hostWorkoutControls').classList.remove('hidden');
         }
 
         // Update old session tab UI as well
