@@ -820,7 +820,7 @@ class App {
 
                     // Update host controls
                     document.getElementById('startSyncedBtn').style.display = 'none';
-                    document.getElementById('endSyncedBtn').style.display = 'block';
+                    document.getElementById('endSyncedBtn').classList.remove('hidden');
                 }
             }, 1000);
         }
@@ -834,7 +834,7 @@ class App {
 
         // Reset host controls
         document.getElementById('startSyncedBtn').style.display = 'block';
-        document.getElementById('endSyncedBtn').style.display = 'none';
+        document.getElementById('endSyncedBtn').classList.add('hidden');
     }
 
     startSyncedWorkout() {
@@ -893,7 +893,7 @@ class App {
 
         // Reset host controls
         document.getElementById('startSyncedBtn').style.display = 'block';
-        document.getElementById('endSyncedBtn').style.display = 'none';
+        document.getElementById('endSyncedBtn').classList.add('hidden');
     }
 
     openMeetLink() {

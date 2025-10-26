@@ -225,7 +225,7 @@
                     </div>
 
                     <div class="workout-controls">
-                        <button onclick="workoutDesigner.stopWorkout()" id="stopWorkoutBtn" class="btn btn-danger btn-lg">
+                        <button onclick="workoutDesigner.stopWorkout()" id="stopWorkoutBtn" class="btn-lg-destructive">
                             <i data-lucide="square"></i>
                             <span>Stop Workout</span>
                         </button>
@@ -270,15 +270,15 @@
                     </div>
 
                     <div class="workout-summary-actions">
-                        <button onclick="app.downloadWorkoutTCX()" class="btn btn-primary btn-lg">
+                        <button onclick="app.downloadWorkoutTCX()" class="btn-lg">
                             <i data-lucide="upload"></i>
                             <span>Download TCX for Strava</span>
                         </button>
-                        <button onclick="app.downloadWorkoutJSON()" class="btn btn-ghost">
+                        <button onclick="app.downloadWorkoutJSON()" class="btn-ghost">
                             <i data-lucide="download"></i>
                             <span>Download JSON</span>
                         </button>
-                        <button onclick="app.dismissWorkoutSummary()" class="btn btn-ghost">
+                        <button onclick="app.dismissWorkoutSummary()" class="btn-ghost">
                             <i data-lucide="x"></i>
                             <span>Close</span>
                         </button>
@@ -457,19 +457,19 @@
                             </h2>
                         </div>
                         <div class="card-content">
-                            <button onclick="app.saveWorkout()" class="btn btn-block">
+                            <button onclick="app.saveWorkout()" class="btn w-full">
                                 <i data-lucide="save"></i>
                                 <span>Save Workout</span>
                             </button>
-                            <button onclick="app.exportWorkout()" class="btn btn-block">
+                            <button onclick="app.exportWorkout()" class="btn w-full">
                                 <i data-lucide="download"></i>
                                 <span>Export JSON</span>
                             </button>
-                            <button onclick="app.importWorkout()" class="btn btn-block">
+                            <button onclick="app.importWorkout()" class="btn w-full">
                                 <i data-lucide="upload"></i>
                                 <span>Import JSON</span>
                             </button>
-                            <button onclick="app.loadWorkoutForRide()" class="btn btn-primary btn-block">
+                            <button onclick="app.loadWorkoutForRide()" class="btn w-full">
                                 <i data-lucide="play"></i>
                                 <span>Load & Ride</span>
                             </button>
@@ -485,7 +485,7 @@
         <div class="workouts-container">
             <div class="workouts-header">
                 <h1 class="workouts-title">Workout Library</h1>
-                <button onclick="app.importWorkout()" class="btn btn-primary">
+                <button onclick="app.importWorkout()" class="btn">
                     <i data-lucide="upload"></i>
                     <span>Import Workout</span>
                 </button>
@@ -523,7 +523,7 @@
                             <div class="control-group">
                                 <label class="control-label">Your Name</label>
                                 <input type="text" id="hostNameInput" placeholder="Enter your name" value="Rider" class="text-input">
-                                <button onclick="app.createSession()" class="btn btn-primary btn-block btn-lg">
+                                <button onclick="app.createSession()" class="btn-lg w-full">
                                     <i data-lucide="play-circle"></i>
                                     <span>Create Session</span>
                                 </button>
@@ -545,7 +545,7 @@
                                 <label class="control-label">Session Code</label>
                                 <input type="text" id="sessionCodeInput" placeholder="e.g., swift-mountain-climbing-falcon" class="text-input">
                                 <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">Paste the full session code from your friend</p>
-                                <button onclick="app.joinSession()" class="btn btn-primary btn-block btn-lg">
+                                <button onclick="app.joinSession()" class="btn-lg w-full">
                                     <i data-lucide="log-in"></i>
                                     <span>Join Session</span>
                                 </button>
@@ -565,7 +565,7 @@
                             <i data-lucide="copy"></i>
                         </button>
                     </div>
-                    <button onclick="app.disconnectSession()" class="btn btn-danger">
+                    <button onclick="app.disconnectSession()" class="btn-destructive">
                         <i data-lucide="log-out"></i>
                         <span>Leave Session</span>
                     </button>
@@ -603,7 +603,7 @@
                             <p>Connect with your friends via Google Meet:</p>
                             <div class="control-group">
                                 <input type="text" id="meetLinkInput" placeholder="Paste Google Meet link" class="text-input">
-                                <button onclick="app.openMeetLink()" class="btn btn-primary btn-block">
+                                <button onclick="app.openMeetLink()" class="btn w-full">
                                     <i data-lucide="external-link"></i>
                                     <span>Open Google Meet</span>
                                 </button>
@@ -653,11 +653,11 @@
                             <div class="countdown-number" id="countdownNumber">5</div>
                             <div class="countdown-text">Get Ready!</div>
                         </div>
-                        <button onclick="app.startSyncedWorkout()" id="startSyncedBtn" class="btn btn-primary btn-block btn-lg">
+                        <button onclick="app.startSyncedWorkout()" id="startSyncedBtn" class="btn-lg w-full">
                             <i data-lucide="play"></i>
                             <span>Start Synchronized Workout (5s countdown)</span>
                         </button>
-                        <button onclick="app.endSyncedWorkout()" id="endSyncedBtn" class="btn btn-danger btn-block" style="display: none; margin-top: 0.75rem;">
+                        <button onclick="app.endSyncedWorkout()" id="endSyncedBtn" class="btn-destructive w-full hidden mt-3">
                             <i data-lucide="square"></i>
                             <span>End Workout for All</span>
                         </button>
