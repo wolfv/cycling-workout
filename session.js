@@ -115,9 +115,10 @@ class SessionManager {
         return new Promise((resolve, reject) => {
             // Generate unique peer ID
             const peerId = `zwift-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            console.log('Creating peer with ID:', peerId);
 
             this.peer = new Peer(peerId, {
-                debug: 0,
+                debug: 2, // Enable debug logging
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
@@ -125,8 +126,10 @@ class SessionManager {
                     ]
                 }
             });
+            console.log('Peer object created:', this.peer);
 
             this.peer.on('open', (id) => {
+                console.log('Peer open event fired! ID:', id);
                 this.sessionId = this.generateSessionCode(id);
                 this.isHost = true;
                 this.hostPeerId = id;
@@ -152,6 +155,7 @@ class SessionManager {
             });
 
             this.peer.on('connection', (conn) => {
+                console.log('Incoming connection:', conn);
                 this.handleIncomingConnection(conn);
             });
 
@@ -159,6 +163,22 @@ class SessionManager {
                 console.error('Peer error:', err);
                 reject(err);
             });
+
+            this.peer.on('disconnected', () => {
+                console.warn('Peer disconnected');
+            });
+
+            this.peer.on('close', () => {
+                console.warn('Peer closed');
+            });
+
+            // Add timeout to prevent hanging forever
+            setTimeout(() => {
+                if (!this.sessionId) {
+                    console.error('Peer connection timeout - open event never fired');
+                    reject(new Error('Connection timeout - unable to connect to PeerJS server'));
+                }
+            }, 30000); // 30 second timeout
         });
     }
 
