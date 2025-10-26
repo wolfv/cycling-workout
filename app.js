@@ -588,8 +588,11 @@ class App {
             this.log(`Session created: ${result.sessionId}`, 'success');
             this.updateSessionUI(result.sessionId, true);
 
-            // Close the popover
-            document.getElementById('session-popover').hidePopover();
+            // Close the popover by setting aria-hidden
+            const popoverContent = document.getElementById('session-popover-content');
+            const popoverTrigger = document.getElementById('session-popover-trigger');
+            popoverContent.setAttribute('aria-hidden', 'true');
+            popoverTrigger.setAttribute('aria-expanded', 'false');
         } catch (err) {
             console.error('quickCreateSession error:', err);
             alert('Failed to create session: ' + err.message);
@@ -613,8 +616,11 @@ class App {
             this.log(`Joined session: ${result.sessionId}`, 'success');
             this.updateSessionUI(result.sessionId, false);
 
-            // Close the popover
-            document.getElementById('session-popover').hidePopover();
+            // Close the popover by setting aria-hidden
+            const popoverContent = document.getElementById('session-popover-content');
+            const popoverTrigger = document.getElementById('session-popover-trigger');
+            popoverContent.setAttribute('aria-hidden', 'true');
+            popoverTrigger.setAttribute('aria-expanded', 'false');
         } catch (err) {
             alert('Failed to join session: ' + err.message);
             console.error(err);

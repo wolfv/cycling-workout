@@ -80,40 +80,38 @@
                 <!-- Session Controls -->
                 <div class="flex gap-3 items-center mb-6">
                     <!-- Join Session Popover (when not connected) -->
-                    <div id="sessionPopoverTrigger">
-                        <button type="button" popovertarget="session-popover" class="btn-outline">
+                    <div id="sessionPopoverTrigger" class="popover">
+                        <button id="session-popover-trigger" type="button" aria-expanded="false" aria-controls="session-popover-content" class="btn-outline">
                             <i data-lucide="users"></i>
                             <span>Join Session</span>
                         </button>
-                        <div id="session-popover" popover class="popover w-[400px]">
-                            <article onclick="event.stopPropagation()">
+                        <div id="session-popover-content" data-popover aria-hidden="true" class="w-80">
+                            <div class="grid gap-4">
                                 <header class="grid gap-1.5">
                                     <h4 class="leading-none font-medium">Join or Create Session</h4>
                                     <p class="text-muted-foreground text-sm">Ride with friends in real-time!</p>
                                 </header>
-                                <section>
-                                    <form class="form grid gap-4" onsubmit="app.quickJoinSession(); return false;">
-                                        <div class="grid gap-2">
-                                            <label for="quickJoinName">Your Name</label>
-                                            <input type="text" id="quickJoinName" placeholder="Rider name" value="Rider">
-                                        </div>
-                                        <div class="grid gap-2">
-                                            <label for="quickJoinSessionCode">Session Code</label>
-                                            <input type="text" id="quickJoinSessionCode" placeholder="Paste code to join">
-                                        </div>
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <button type="submit" class="btn">
-                                                <i data-lucide="users"></i>
-                                                Join
-                                            </button>
-                                            <button type="button" onclick="app.quickCreateSession()" class="btn-outline">
-                                                <i data-lucide="plus-circle"></i>
-                                                Create New
-                                            </button>
-                                        </div>
-                                    </form>
-                                </section>
-                            </article>
+                                <form class="form grid gap-4" onsubmit="app.quickJoinSession(); return false;">
+                                    <div class="grid gap-2">
+                                        <label for="quickJoinName">Your Name</label>
+                                        <input type="text" id="quickJoinName" placeholder="Rider name" value="Rider" class="h-8">
+                                    </div>
+                                    <div class="grid gap-2">
+                                        <label for="quickJoinSessionCode">Session Code</label>
+                                        <input type="text" id="quickJoinSessionCode" placeholder="Paste code to join" class="h-8">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button type="submit" class="btn">
+                                            <i data-lucide="users"></i>
+                                            Join
+                                        </button>
+                                        <button type="button" onclick="app.quickCreateSession()" class="btn-outline">
+                                            <i data-lucide="plus-circle"></i>
+                                            Create New
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
 
