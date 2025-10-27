@@ -1336,3 +1336,22 @@ input[type="range"]:focus::-moz-range-thumb {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
 }
+
+/* Details/Summary collapsible chevron rotation */
+details[open] .details-chevron {
+    transform: rotate(180deg);
+}
+
+details summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+details summary:hover {
+    background: hsl(var(--muted) / 0.3);
+}

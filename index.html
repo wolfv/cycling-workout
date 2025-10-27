@@ -372,17 +372,18 @@
             </div>
 
             <!-- Activity Log -->
-            <div class="card">
-                <header>
+            <details class="card" open>
+                <summary class="flex items-center justify-between cursor-pointer p-6 border-b border-border">
                     <h2 class="flex items-center gap-2">
                         <i data-lucide="terminal"></i>
                         <span>Activity Log</span>
                     </h2>
-                </header>
+                    <i data-lucide="chevron-down" class="details-chevron w-5 h-5 text-muted-foreground transition-transform"></i>
+                </summary>
                 <section>
                     <div class="log" id="log"></div>
                 </section>
-            </div>
+            </details>
         </div>
     </div>
     </div>

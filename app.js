@@ -122,7 +122,10 @@ class App {
         if (result) {
             this.log('Session restored successfully!', 'success');
 
-            // Update UI based on host/participant
+            // Update new UI (riders panel)
+            this.updateSessionUI(result.sessionId, this.sessionManager.isHost);
+
+            // Update old session tab UI
             document.getElementById('sessionNotConnected').style.display = 'none';
             document.getElementById('sessionConnected').style.display = 'block';
             document.getElementById('sessionCodeDisplay').textContent = result.sessionId;
