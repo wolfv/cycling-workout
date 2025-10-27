@@ -25,23 +25,24 @@
                             <button
                                 onclick="app.connect()"
                                 x-show="!$store.app.connected && !$store.app.connecting"
+                                x-cloak
                                 class="btn-sm w-full bg-blue-600 hover:bg-blue-700 text-white border-blue-600">
                                 <i data-lucide="bluetooth"></i>
                                 <span>Connect</span>
                             </button>
                             <button
                                 x-show="$store.app.connecting"
+                                x-cloak
                                 disabled
-                                class="btn-sm-outline w-full"
-                                style="display: none;">
+                                class="btn-sm-outline w-full">
                                 <i data-lucide="loader" class="animate-spin"></i>
                                 <span>Connecting...</span>
                             </button>
                             <button
                                 onclick="app.disconnect()"
                                 x-show="$store.app.connected"
-                                class="btn-sm-outline w-full"
-                                style="display: none;">
+                                x-cloak
+                                class="btn-sm-outline w-full">
                                 <i data-lucide="bluetooth-off"></i>
                                 <span>Disconnect</span>
                             </button>
