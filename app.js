@@ -111,8 +111,12 @@ class App {
         setTimeout(async () => {
             const connected = await this.ftms.reconnectToLastDevice();
             if (connected) {
-                this.updateConnectionStatus(true);
+                if (window.Alpine) {
+                    Alpine.store('app').setConnected(true, this.ftms.device?.name);
+                }
                 this.startMetricsBroadcast();
+                // Enable Set Power button
+                document.getElementById('setPowerBtn').disabled = false;
             }
         }, 1000);
     }
