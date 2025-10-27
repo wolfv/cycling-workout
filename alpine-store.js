@@ -1,5 +1,6 @@
 // Alpine.js Global Store for Zwift Hub Controller
 document.addEventListener('alpine:init', () => {
+    console.log('Alpine initializing, creating store...');
     Alpine.store('app', {
         // Connection state
         connected: false,
@@ -126,4 +127,5 @@ document.addEventListener('alpine:init', () => {
             return `${formatTime(elapsed)} / ${formatTime(total)}`;
         }
     });
+    console.log('Alpine store created:', Alpine.store('app'));
 });
