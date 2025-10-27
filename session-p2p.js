@@ -29,6 +29,9 @@ class P2PSessionManager {
 
         await this.connectToSignaling();
 
+        // Save session state for persistence
+        this.saveSessionState();
+
         return {
             sessionId: this.sessionId,
             peerId: this.myPeerId
@@ -41,6 +44,9 @@ class P2PSessionManager {
         this.sessionId = sessionCode;
 
         await this.connectToSignaling();
+
+        // Save session state for persistence
+        this.saveSessionState();
 
         return {
             sessionId: this.sessionId,
@@ -459,6 +465,9 @@ class P2PSessionManager {
         this.participants.clear();
         this.sessionId = null;
         this.myPeerId = null;
+
+        // Clear persisted session state
+        this.clearSessionState();
     }
 
     getShareInfo() {
