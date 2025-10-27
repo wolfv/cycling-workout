@@ -26,14 +26,12 @@
                             <button
                                 onclick="app.connect()"
                                 x-show="!$store.app.connected && !$store.app.connecting"
-                                x-cloak
                                 class="btn-sm w-full bg-blue-600 hover:bg-blue-700 text-white border-blue-600">
                                 <i data-lucide="bluetooth"></i>
                                 <span>Connect</span>
                             </button>
                             <button
                                 x-show="$store.app.connecting"
-                                x-cloak
                                 disabled
                                 class="btn-sm-outline w-full">
                                 <i data-lucide="loader" class="animate-spin"></i>
@@ -42,7 +40,6 @@
                             <button
                                 onclick="app.disconnect()"
                                 x-show="$store.app.connected"
-                                x-cloak
                                 class="btn-sm-outline w-full">
                                 <i data-lucide="bluetooth-off"></i>
                                 <span>Disconnect</span>
@@ -303,7 +300,7 @@
         <!-- Right Sidebar -->
         <div class="dashboard-sidebar">
             <!-- Riders (when in session) -->
-            <div class="card" x-show="$store.app.session.active" x-cloak>
+            <div class="card" x-show="$store.app.session.active">
                 <header>
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="flex items-center gap-2">
