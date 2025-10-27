@@ -174,21 +174,14 @@ class App {
     }
 
     handleMetricsUpdate(metrics) {
-        // Update UI
-        document.getElementById('powerValue').textContent = Math.max(0, metrics.power);
-
-        // Update HR with zone color
-        const hrElement = document.getElementById('hrValue');
-        hrElement.textContent = metrics.hr || '--';
-        if (metrics.hr > 0) {
-            const hrColor = HRZones.getHRColor(metrics.hr);
-            hrElement.style.color = hrColor;
-        } else {
-            hrElement.style.color = '';
+        // Update Alpine store
+        if (window.Alpine) {
+            Alpine.store('app').updateMetrics({
+                power: Math.max(0, metrics.power),
+                heartRate: metrics.hr || 0,
+                cadence: metrics.cadence || 0
+            });
         }
-
-        document.getElementById('cadenceValue').textContent = metrics.cadence || 0;
-        document.getElementById('statusValue').textContent = '✓';
 
         // Update chart
         const targetPower = this.chart.currentTargetPower;
@@ -215,16 +208,34 @@ class App {
     }
 
     async connect() {
+        // Set connecting state
+        if (window.Alpine) {
+            Alpine.store('app').setConnecting(true);
+        }
+
         const connected = await this.ftms.connect();
         if (connected) {
-            this.updateConnectionUI(true);
+            if (window.Alpine) {
+                Alpine.store('app').setConnected(true, this.ftms.device?.name);
+            }
             this.chart.clear();
+            // Enable Set Power button
+            document.getElementById('setPowerBtn').disabled = false;
+        } else {
+            if (window.Alpine) {
+                Alpine.store('app').setConnecting(false);
+            }
         }
     }
 
     disconnect() {
         this.ftms.disconnect();
-        this.updateConnectionUI(false);
+        if (window.Alpine) {
+            Alpine.store('app').setConnected(false);
+        }
+        // Disable Set Power button
+        document.getElementById('setPowerBtn').disabled = true;
+
         if (this.rampInterval) {
             clearTimeout(this.rampInterval);
             this.rampInterval = null;
@@ -232,13 +243,6 @@ class App {
         if (window.workoutDesigner.isRunning) {
             window.workoutDesigner.stopWorkout();
         }
-    }
-
-    updateConnectionUI(connected) {
-        document.getElementById('connectBtn').disabled = connected;
-        document.getElementById('disconnectBtn').disabled = !connected;
-        document.getElementById('setPowerBtn').disabled = !connected;
-        document.getElementById('statusValue').textContent = connected ? '✓' : '✗';
     }
 
     handleWorkoutStart() {
@@ -559,10 +563,10 @@ class App {
             this.sessionManager.disconnect();
             this.log('Left session', 'warning');
 
-            // Update main UI (using Tailwind classes)
-            document.getElementById('sessionPopoverTrigger').classList.remove('hidden');
-            document.getElementById('ridersCard').classList.add('hidden');
-            document.getElementById('quickStartSyncedBtn').classList.add('hidden');
+            // Update Alpine store
+            if (window.Alpine) {
+                Alpine.store('app').clearSession();
+            }
 
             // Update old session tab UI
             document.getElementById('sessionNotConnected').style.display = 'block';
@@ -630,16 +634,9 @@ class App {
     }
 
     updateSessionUI(sessionId, isHost) {
-        // Hide popover trigger
-        document.getElementById('sessionPopoverTrigger').classList.add('hidden');
-
-        // Show riders card with session info
-        document.getElementById('ridersCard').classList.remove('hidden');
-        document.getElementById('sessionCodeSidebar').textContent = sessionId;
-
-        // Show host controls if host
-        if (isHost) {
-            document.getElementById('quickStartSyncedBtn').classList.remove('hidden');
+        // Update Alpine store
+        if (window.Alpine) {
+            Alpine.store('app').setSession(sessionId, isHost, this.sessionManager.userName);
         }
 
         // Update old session tab UI as well
@@ -677,6 +674,11 @@ class App {
     }
 
     handleParticipantUpdate(participants) {
+        // Update Alpine store
+        if (window.Alpine) {
+            Alpine.store('app').updateParticipants(participants);
+        }
+
         // Update participants list in Session tab
         const listEl = document.getElementById('participantsList');
         if (listEl) {
@@ -737,13 +739,8 @@ class App {
             }
         }
 
-        // Update sidebar riders list and count
+        // Update sidebar riders list (count is handled by Alpine)
         const sidebarListEl = document.getElementById('ridersListSidebar');
-        const riderCountEl = document.getElementById('riderCount');
-
-        if (riderCountEl) {
-            riderCountEl.textContent = participants.length;
-        }
 
         if (sidebarListEl) {
             if (participants.length === 0) {

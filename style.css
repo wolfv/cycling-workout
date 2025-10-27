@@ -1355,3 +1355,8 @@ details summary::-webkit-details-marker {
 details summary:hover {
     background: hsl(var(--muted) / 0.3);
 }
+
+/* Alpine.js x-cloak - hide elements until Alpine is ready */
+[x-cloak] {
+    display: none !important;
+}

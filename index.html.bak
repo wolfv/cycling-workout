@@ -22,24 +22,11 @@
                             <h2 class="text-xl font-semibold">Zwift Hub</h2>
                         </div>
                         <div class="flex flex-col gap-2">
-                            <button
-                                onclick="app.connect()"
-                                x-show="!$store.app.connected && !$store.app.connecting"
-                                class="btn-sm w-full">
+                            <button id="connectBtn" onclick="app.connect()" class="btn-sm w-full">
                                 <i data-lucide="bluetooth"></i>
                                 <span>Connect</span>
                             </button>
-                            <button
-                                x-show="$store.app.connecting"
-                                disabled
-                                class="btn-sm-outline w-full">
-                                <i data-lucide="loader" class="animate-spin"></i>
-                                <span>Connecting...</span>
-                            </button>
-                            <button
-                                onclick="app.disconnect()"
-                                x-show="$store.app.connected"
-                                class="btn-sm-outline w-full">
+                            <button id="disconnectBtn" onclick="app.disconnect()" disabled class="btn-sm-outline w-full">
                                 <i data-lucide="bluetooth-off"></i>
                                 <span>Disconnect</span>
                             </button>
@@ -94,7 +81,7 @@
                 <!-- Session Controls -->
                 <div class="flex gap-3 items-center mb-6">
                     <!-- Join Session Popover (when not connected) -->
-                    <div class="popover" x-show="!$store.app.session.active">
+                    <div id="sessionPopoverTrigger" class="popover">
                         <button id="session-popover-trigger" type="button" aria-expanded="false" aria-controls="session-popover-content" class="btn-outline">
                             <i data-lucide="users"></i>
                             <span>Join Session</span>
@@ -137,7 +124,7 @@
                         <i data-lucide="zap" class="metric-icon"></i>
                         <span class="metric-label">Power</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.power">0</div>
+                    <div class="metric-value" id="powerValue">0</div>
                     <div class="metric-footer">watts</div>
                 </div>
                 <div class="metric-card">
@@ -145,7 +132,7 @@
                         <i data-lucide="heart" class="metric-icon"></i>
                         <span class="metric-label">Heart Rate</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.heartRate">0</div>
+                    <div class="metric-value" id="hrValue">0</div>
                     <div class="metric-footer">bpm</div>
                 </div>
                 <div class="metric-card">
@@ -153,7 +140,7 @@
                         <i data-lucide="gauge" class="metric-icon"></i>
                         <span class="metric-label">Cadence</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.cadence">0</div>
+                    <div class="metric-value" id="cadenceValue">0</div>
                     <div class="metric-footer">rpm</div>
                 </div>
                 <div class="metric-card">
@@ -161,7 +148,7 @@
                         <i data-lucide="target" class="metric-icon"></i>
                         <span class="metric-label">Target</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.targetPower">--</div>
+                    <div class="metric-value" id="targetPowerValue">--</div>
                     <div class="metric-footer">watts</div>
                 </div>
                 <div class="metric-card">
@@ -169,7 +156,7 @@
                         <i data-lucide="activity" class="metric-icon"></i>
                         <span class="metric-label">Status</span>
                     </div>
-                    <div class="metric-value metric-status" x-text="$store.app.connectionStatus">--</div>
+                    <div class="metric-value metric-status" id="statusValue">--</div>
                     <div class="metric-footer">connection</div>
                 </div>
             </div>
@@ -299,7 +286,7 @@
         <!-- Right Sidebar -->
         <div class="dashboard-sidebar">
             <!-- Riders (when in session) -->
-            <div class="card" x-show="$store.app.session.active" x-cloak>
+            <div class="card hidden" id="ridersCard">
                 <header>
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="flex items-center gap-2">
@@ -315,7 +302,7 @@
                         <div class="flex items-center justify-between text-sm">
                             <span class="text-muted-foreground">Code:</span>
                             <div class="flex items-center gap-2">
-                                <code class="bg-muted px-2 py-1 rounded text-xs" x-text="$store.app.session.sessionId || '---'">---</code>
+                                <code id="sessionCodeSidebar" class="bg-muted px-2 py-1 rounded text-xs">---</code>
                                 <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
                                     <i data-lucide="copy" class="w-3 h-3"></i>
                                 </button>
@@ -323,7 +310,7 @@
                         </div>
                         <div class="flex items-center justify-between text-sm">
                             <span class="text-muted-foreground">Riders:</span>
-                            <span class="font-medium" x-text="$store.app.riderCount">0</span>
+                            <span id="riderCount" class="font-medium">0</span>
                         </div>
                     </div>
                 </header>
@@ -334,7 +321,7 @@
                 </section>
                 <footer>
                     <div class="grid gap-2">
-                        <button onclick="app.startSyncedWorkout()" x-show="$store.app.session.isHost" class="btn w-full">
+                        <button onclick="app.startSyncedWorkout()" id="quickStartSyncedBtn" class="btn w-full hidden">
                             <i data-lucide="play"></i>
                             Start for Everyone
                         </button>
@@ -696,7 +683,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
-    <script src="alpine-store.js"></script>
     <script src="ftms.js"></script>
     <script src="chart.js"></script>
     <script src="workout-preview.js"></script>
