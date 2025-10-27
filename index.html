@@ -114,22 +114,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Session Info (when connected) -->
-                    <div id="sessionInfoBadge" class="hidden flex gap-3 items-center">
-                        <span class="badge">
-                            <i data-lucide="users" class="w-3.5 h-3.5"></i>
-                            Connected
-                        </span>
-                        <code id="sessionCodeQuick" class="bg-muted px-2 py-1 rounded text-sm">---</code>
-                        <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
-                            <i data-lucide="copy"></i>
-                        </button>
-                        <button onclick="app.disconnectSession()" class="btn-sm-destructive">
-                            <i data-lucide="log-out"></i>
-                            Leave
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Metrics -->
@@ -303,21 +287,48 @@
             <!-- Riders (when in session) -->
             <div class="card hidden" id="ridersCard">
                 <header>
-                    <h2 class="flex items-center gap-2">
-                        <i data-lucide="users"></i>
-                        <span>Riders</span>
-                    </h2>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="flex items-center gap-2">
+                            <i data-lucide="users"></i>
+                            <span>Session</span>
+                        </h2>
+                        <span class="badge badge-success">
+                            <i data-lucide="wifi" class="w-3 h-3"></i>
+                            Connected
+                        </span>
+                    </div>
+                    <div class="grid gap-2">
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-muted-foreground">Code:</span>
+                            <div class="flex items-center gap-2">
+                                <code id="sessionCodeSidebar" class="bg-muted px-2 py-1 rounded text-xs">---</code>
+                                <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
+                                    <i data-lucide="copy" class="w-3 h-3"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-muted-foreground">Riders:</span>
+                            <span id="riderCount" class="font-medium">0</span>
+                        </div>
+                    </div>
                 </header>
                 <section class="px-0">
                     <div id="ridersListSidebar" class="riders-list">
                         <!-- Riders will be rendered here -->
                     </div>
                 </section>
-                <footer id="hostWorkoutControls" class="hidden">
-                    <button onclick="app.startSyncedWorkout()" id="quickStartSyncedBtn" class="btn w-full">
-                        <i data-lucide="play"></i>
-                        Start for Everyone
-                    </button>
+                <footer>
+                    <div class="grid gap-2">
+                        <button onclick="app.startSyncedWorkout()" id="quickStartSyncedBtn" class="btn w-full hidden">
+                            <i data-lucide="play"></i>
+                            Start for Everyone
+                        </button>
+                        <button onclick="app.disconnectSession()" class="btn-destructive w-full">
+                            <i data-lucide="log-out"></i>
+                            Leave Session
+                        </button>
+                    </div>
                 </footer>
             </div>
 

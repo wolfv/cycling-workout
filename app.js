@@ -558,9 +558,8 @@ class App {
 
             // Update main UI (using Tailwind classes)
             document.getElementById('sessionPopoverTrigger').classList.remove('hidden');
-            document.getElementById('sessionInfoBadge').classList.add('hidden');
             document.getElementById('ridersCard').classList.add('hidden');
-            document.getElementById('hostWorkoutControls').classList.add('hidden');
+            document.getElementById('quickStartSyncedBtn').classList.add('hidden');
 
             // Update old session tab UI
             document.getElementById('sessionNotConnected').style.display = 'block';
@@ -628,17 +627,16 @@ class App {
     }
 
     updateSessionUI(sessionId, isHost) {
-        // Hide popover trigger, show info badge (using Tailwind classes)
+        // Hide popover trigger
         document.getElementById('sessionPopoverTrigger').classList.add('hidden');
-        document.getElementById('sessionInfoBadge').classList.remove('hidden');
-        document.getElementById('sessionCodeQuick').textContent = sessionId;
 
-        // Show riders card
+        // Show riders card with session info
         document.getElementById('ridersCard').classList.remove('hidden');
+        document.getElementById('sessionCodeSidebar').textContent = sessionId;
 
         // Show host controls if host
         if (isHost) {
-            document.getElementById('hostWorkoutControls').classList.remove('hidden');
+            document.getElementById('quickStartSyncedBtn').classList.remove('hidden');
         }
 
         // Update old session tab UI as well
@@ -736,8 +734,14 @@ class App {
             }
         }
 
-        // Update sidebar riders list
+        // Update sidebar riders list and count
         const sidebarListEl = document.getElementById('ridersListSidebar');
+        const riderCountEl = document.getElementById('riderCount');
+
+        if (riderCountEl) {
+            riderCountEl.textContent = participants.length;
+        }
+
         if (sidebarListEl) {
             if (participants.length === 0) {
                 sidebarListEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No riders</div>';
