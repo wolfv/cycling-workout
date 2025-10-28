@@ -180,11 +180,10 @@ class App {
     handleMetricsUpdate(metrics) {
         // Update Alpine store
         if (window.Alpine) {
-            Alpine.store('app').updateMetrics({
-                power: Math.max(0, metrics.power),
-                heartRate: metrics.hr || 0,
-                cadence: metrics.cadence || 0
-            });
+            const store = Alpine.store('app');
+            store.metrics.power = Math.max(0, metrics.power);
+            store.metrics.heartRate = metrics.hr || 0;
+            store.metrics.cadence = metrics.cadence || 0;
         }
 
         // Update chart
@@ -251,13 +250,20 @@ class App {
 
     handleWorkoutStart() {
         // Show active workout card when workout starts
+        document.getElementById('activeWorkoutCard').style.display = 'block';
         document.getElementById('activeWorkoutCard').classList.remove('hidden');
         // Hide workout control card
+        document.getElementById('workoutControlCard').style.display = 'none';
         document.getElementById('workoutControlCard').classList.add('hidden');
         // Hide workout summary if showing
         document.getElementById('workoutSummaryCard').classList.add('hidden');
         // Switch to ride tab
         this.switchTab('ride');
+
+        // Show participants section if in a session
+        if (this.sessionManager && this.sessionManager.isConnected()) {
+            this.updateWorkoutParticipants();
+        }
 
         // Start recording workout
         const workoutName = 'Indoor Cycling Workout';
@@ -274,6 +280,7 @@ class App {
         this.log(`Recording stopped: ${dataPoints} data points`, 'info');
 
         // Hide active workout card when workout stops
+        document.getElementById('activeWorkoutCard').style.display = 'none';
         document.getElementById('activeWorkoutCard').classList.add('hidden');
 
         // Show workout summary if we have data
@@ -282,6 +289,7 @@ class App {
         } else {
             // Show workout control card again if we have intervals
             if (window.workoutDesigner.intervals.length > 0) {
+                document.getElementById('workoutControlCard').style.display = 'block';
                 document.getElementById('workoutControlCard').classList.remove('hidden');
             }
         }
@@ -346,10 +354,82 @@ class App {
             return;
         }
         // Show workout control card
+        document.getElementById('workoutControlCard').style.display = 'block';
         document.getElementById('workoutControlCard').classList.remove('hidden');
+        
+        // Show host sync button if in session and is host
+        this.updateWorkoutControlButtons();
+        
         // Switch to ride tab
         this.switchTab('ride');
-        this.log('Workout loaded! Connect your trainer and click "Start Workout" in the sidebar.', 'success');
+        
+        setTimeout(() => lucide.createIcons(), 0);
+    }
+
+    updateWorkoutControlButtons() {
+        const syncBtn = document.getElementById('startSyncedBtnSidebar');
+        const normalBtn = document.getElementById('startWorkoutBtn');
+        
+        if (this.sessionManager && this.sessionManager.isConnected() && this.sessionManager.isHost) {
+            // Show sync button for host, hide normal button
+            if (syncBtn) syncBtn.style.display = 'block';
+            if (normalBtn) normalBtn.style.display = 'none';
+        } else {
+            // Show normal button, hide sync button
+            if (syncBtn) syncBtn.style.display = 'none';
+            if (normalBtn) normalBtn.style.display = 'block';
+        }
+    }
+
+    updateWorkoutParticipants() {
+        const section = document.getElementById('workoutParticipantsSection');
+        const list = document.getElementById('workoutParticipantsList');
+        
+        if (!section || !list) return;
+        
+        if (this.sessionManager && this.sessionManager.isConnected()) {
+            const participants = this.sessionManager.getParticipants();
+            
+            if (participants.length > 0) {
+                section.style.display = 'block';
+                
+                list.innerHTML = participants.map(p => {
+                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                    const isMe = p.id === this.sessionManager.myId;
+                    
+                    return `
+                        <div class="p-3 bg-muted/50 border border-border rounded-md ${isMe ? 'border-l-4 border-l-primary' : ''}">
+                            <div class="flex justify-between items-center mb-2">
+                                <div class="font-semibold text-sm">
+                                    ${p.name}
+                                    ${p.isHost ? '<span class="badge badge-warning ml-1 text-xs">HOST</span>' : ''}
+                                    ${isMe ? '<span class="badge badge-primary ml-1 text-xs">YOU</span>' : ''}
+                                </div>
+                                <span class="text-xs text-muted-foreground">${p.ftp}W FTP</span>
+                            </div>
+                            <div class="flex gap-3 text-xs text-muted-foreground">
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="zap" class="w-3 h-3"></i> ${p.power}W
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="gauge" class="w-3 h-3"></i> ${p.cadence}
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="heart" class="w-3 h-3"></i>
+                                    <span style="color: ${hrColor}">${p.heartRate || '--'}</span>
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                setTimeout(() => lucide.createIcons(), 0);
+            } else {
+                section.style.display = 'none';
+            }
+        } else {
+            section.style.display = 'none';
+        }
     }
 
     updateFTP() {
@@ -597,6 +677,13 @@ class App {
 
             // Clear race track
             this.raceTrack.clear();
+            
+            // Update workout control buttons (hide sync, show normal)
+            this.updateWorkoutControlButtons();
+            
+            // Hide workout participants section
+            const section = document.getElementById('workoutParticipantsSection');
+            if (section) section.style.display = 'none';
 
             setTimeout(() => lucide.createIcons(), 0);
         }
@@ -674,6 +761,9 @@ class App {
         if (window.workoutDesigner.intervals.length > 0) {
             this.raceTrack.setWorkout(window.workoutDesigner.intervals, ftp);
         }
+        
+        // Update workout control buttons
+        this.updateWorkoutControlButtons();
 
         setTimeout(() => lucide.createIcons(), 100);
     }
@@ -791,6 +881,14 @@ class App {
         // Update race track
         this.raceTrack.setParticipants(participants);
         this.raceTrack.draw();
+        
+        // Update workout participants list if workout is active
+        if (window.workoutDesigner && window.workoutDesigner.isRunning) {
+            this.updateWorkoutParticipants();
+        }
+        
+        // Update workout control buttons
+        this.updateWorkoutControlButtons();
     }
 
     handleWorkoutReceived(workout) {

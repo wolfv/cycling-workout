@@ -54,10 +54,6 @@ document.addEventListener('alpine:init', () => {
             this.metrics[key] = value;
         },
 
-        updateMetrics(metrics) {
-            Object.assign(this.metrics, metrics);
-        },
-
         setSession(sessionId, isHost, riderName) {
             this.session.active = true;
             this.session.sessionId = sessionId;

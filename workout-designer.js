@@ -392,6 +392,16 @@ class WorkoutDesigner {
 
             document.getElementById('currentIntervalName').textContent = currentInterval.name;
             document.getElementById('currentIntervalTarget').textContent = `${power}W (${this.formatDuration(Math.round(remaining))} left)`;
+            
+            // Show countdown when less than 10 seconds remaining
+            const countdownEl = document.getElementById('currentIntervalCountdown');
+            const countdownSecsEl = document.getElementById('countdownSeconds');
+            if (countdownEl && countdownSecsEl && remaining <= 10000 && remaining > 0) {
+                countdownEl.style.display = 'block';
+                countdownSecsEl.textContent = Math.ceil(remaining) + 's';
+            } else if (countdownEl) {
+                countdownEl.style.display = 'none';
+            }
         }
 
         // Update next interval info
@@ -605,9 +615,18 @@ class WorkoutDesigner {
                 
                 this.ftms.log(`✓ Imported workout: ${workoutName} (${validIntervals.length} intervals)`, 'success');
                 
-                // Refresh workout library if available
-                if (window.app && typeof window.app.refreshWorkoutLibrary === 'function') {
-                    window.app.refreshWorkoutLibrary();
+                // Refresh workout library and switch to Workouts tab to show the imported workout
+                if (window.app) {
+                    if (typeof window.app.refreshWorkoutLibrary === 'function') {
+                        window.app.refreshWorkoutLibrary();
+                    }
+                    // Switch to Workouts tab to show the imported workout
+                    if (typeof window.app.switchTab === 'function') {
+                        setTimeout(() => {
+                            window.app.switchTab('workouts');
+                            alert(`✓ Successfully imported "${workoutName}"!\n\nThe workout is now available in your library.`);
+                        }, 100);
+                    }
                 }
             } catch (err) {
                 this.ftms.log(`✗ Failed to import workout: ${err.message}`, 'error');
