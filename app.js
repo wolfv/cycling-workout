@@ -433,7 +433,17 @@ class App {
     createWorkoutCard(name, workout) {
         const totalDuration = workout.intervals.reduce((sum, i) => sum + i.duration, 0);
         const totalWork = workout.intervals.reduce((sum, i) => {
-            const power = Math.round((workout.ftp || 200) * (i.percentage / 100));
+            // Calculate power based on powerType
+            const powerType = i.powerType || 'relative';
+            let power;
+            
+            if (powerType === 'absolute') {
+                power = i.power || 0;
+            } else {
+                const percentage = i.percentage || 100;
+                power = Math.round((workout.ftp || 200) * (percentage / 100));
+            }
+            
             return sum + (power * i.duration);
         }, 0) / 1000;
         const avgPower = totalDuration > 0 ? Math.round(totalWork * 1000 / totalDuration) : 0;
@@ -445,12 +455,16 @@ class App {
         };
 
         const created = workout.created ? new Date(workout.created).toLocaleDateString() : 'Unknown';
+        
+        // Get description if available
+        const description = workout.description ? `<div class="workout-card-description">${workout.description}</div>` : '';
 
         return `
             <div class="workout-card" onclick="app.loadWorkoutFromLibrary('${name}')">
                 <div class="workout-card-header">
                     <div>
                         <div class="workout-card-title">${name}</div>
+                        ${description}
                         <div class="workout-card-meta">Created: ${created}</div>
                     </div>
                     <div class="workout-card-actions">

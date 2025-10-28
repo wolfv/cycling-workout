@@ -62,11 +62,22 @@ class WorkoutProgressVisualizer {
         if (!this.intervals || this.intervals.length === 0) return;
 
         const totalDuration = this.intervals.reduce((sum, i) => sum + i.duration, 0);
-        const maxPower = Math.max(...this.intervals.map(i => Math.round(this.ftp * (i.percentage / 100))));
+        
+        // Calculate power for each interval based on type
+        const powers = this.intervals.map(i => {
+            const powerType = i.powerType || 'relative';
+            if (powerType === 'absolute') {
+                return i.power || 0;
+            } else {
+                return Math.round(this.ftp * ((i.percentage || 100) / 100));
+            }
+        });
+        
+        const maxPower = Math.max(...powers);
 
         let x = 0;
         this.intervals.forEach((interval, index) => {
-            const power = Math.round(this.ftp * (interval.percentage / 100));
+            const power = powers[index];
             const barWidth = (interval.duration / totalDuration) * width;
             const barHeight = (power / maxPower) * (height - 30); // Leave space for labels
 

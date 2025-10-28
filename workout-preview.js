@@ -14,8 +14,18 @@ class WorkoutPreview {
 
         if (!intervals || intervals.length === 0) return;
 
+        // Calculate power for each interval based on type
+        const powers = intervals.map(i => {
+            const powerType = i.powerType || 'relative';
+            if (powerType === 'absolute') {
+                return i.power || 0;
+            } else {
+                return Math.round(ftp * ((i.percentage || 100) / 100));
+            }
+        });
+
         // Calculate max power and total duration
-        const maxPower = Math.max(...intervals.map(i => Math.round(ftp * (i.percentage / 100))));
+        const maxPower = Math.max(...powers);
         const totalDuration = intervals.reduce((sum, i) => sum + i.duration, 0);
 
         // Color mapping
@@ -29,8 +39,8 @@ class WorkoutPreview {
         };
 
         let x = 0;
-        intervals.forEach(interval => {
-            const power = Math.round(ftp * (interval.percentage / 100));
+        intervals.forEach((interval, index) => {
+            const power = powers[index];
             const barWidth = (interval.duration / totalDuration) * width;
             const barHeight = (power / maxPower) * height;
 

@@ -6,6 +6,7 @@
     <title>Zwift Hub Controller</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/basecoat.cdn.min.css">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/js/all.min.js" defer></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="alpine-store.js"></script>
@@ -17,7 +18,7 @@
         <nav aria-label="Main navigation">
             <section class="scrollbar">
                 <div role="group">
-                    <div class="p-6 pb-4 border-b border-border">
+                    <div class="pb-4 border-b border-border">
                         <div class="flex items-center gap-3 mb-4">
                             <i data-lucide="bike" class="w-7 h-7 text-accent"></i>
                             <h2 class="text-xl font-semibold">Zwift Hub</h2>
@@ -81,9 +82,9 @@
         </nav>
     </aside>
 
-    <main>
+    <main class="p-8 max-w-[1600px] mx-auto">
         <!-- Mobile sidebar toggle -->
-        <div class="p-4 hidden" id="mobile-nav-toggle">
+        <div class="p-4 hidden md:hidden" id="mobile-nav-toggle">
             <button type="button" onclick="document.dispatchEvent(new CustomEvent('basecoat:sidebar'))" class="btn-outline">
                 <i data-lucide="menu"></i>
                 <span>Menu</span>
@@ -92,11 +93,11 @@
 
         <!-- Ride Tab -->
         <div class="tab-content active" id="content-ride">
-        <div class="dashboard">
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
             <!-- Main Content -->
-            <div class="dashboard-main">
+            <div class="flex flex-col gap-6">
                 <!-- Session Controls -->
-                <div class="flex gap-3 items-center mb-6">
+                <div class="flex gap-3 items-center justify-end">
                     <!-- Join Session Popover (when not connected) -->
                     <div class="popover" x-show="!$store.app.session.active">
                         <button id="session-popover-trigger" type="button" aria-expanded="false" aria-controls="session-popover-content" class="btn-outline">
@@ -135,144 +136,146 @@
                 </div>
 
                 <!-- Metrics -->
-                <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <i data-lucide="zap" class="metric-icon"></i>
-                        <span class="metric-label">Power</span>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="zap" class="size-4 text-muted-foreground"></i>
+                        <span class="text-sm text-muted-foreground font-medium">Power</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.power">0</div>
-                    <div class="metric-footer">watts</div>
+                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.power">0</div>
+                    <div class="text-xs text-muted-foreground uppercase tracking-wide">watts</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <i data-lucide="heart" class="metric-icon"></i>
-                        <span class="metric-label">Heart Rate</span>
+                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="heart" class="size-4 text-muted-foreground"></i>
+                        <span class="text-sm text-muted-foreground font-medium">Heart Rate</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.heartRate">0</div>
-                    <div class="metric-footer">bpm</div>
+                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.heartRate">0</div>
+                    <div class="text-xs text-muted-foreground uppercase tracking-wide">bpm</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <i data-lucide="gauge" class="metric-icon"></i>
-                        <span class="metric-label">Cadence</span>
+                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="gauge" class="size-4 text-muted-foreground"></i>
+                        <span class="text-sm text-muted-foreground font-medium">Cadence</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.cadence">0</div>
-                    <div class="metric-footer">rpm</div>
+                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.cadence">0</div>
+                    <div class="text-xs text-muted-foreground uppercase tracking-wide">rpm</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <i data-lucide="target" class="metric-icon"></i>
-                        <span class="metric-label">Target</span>
+                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="target" class="size-4 text-muted-foreground"></i>
+                        <span class="text-sm text-muted-foreground font-medium">Target</span>
                     </div>
-                    <div class="metric-value" x-text="$store.app.metrics.targetPower">--</div>
-                    <div class="metric-footer">watts</div>
+                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.targetPower">--</div>
+                    <div class="text-xs text-muted-foreground uppercase tracking-wide">watts</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <i data-lucide="activity" class="metric-icon"></i>
-                        <span class="metric-label">Status</span>
+                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="activity" class="size-4 text-muted-foreground"></i>
+                        <span class="text-sm text-muted-foreground font-medium">Status</span>
                     </div>
-                    <div class="metric-value metric-status" x-text="$store.app.connectionStatus">--</div>
-                    <div class="metric-footer">connection</div>
+                    <div class="text-2xl font-bold text-foreground mb-1" x-text="$store.app.connectionStatus">--</div>
+                    <div class="text-xs text-muted-foreground uppercase tracking-wide">connection</div>
                 </div>
             </div>
 
             <!-- Chart -->
             <div class="card">
-                <header>
-                    <h2 class="flex items-center gap-2">
-                        <i data-lucide="line-chart"></i>
+                <header class="border-b border-border">
+                    <h2 class="flex items-center gap-2 text-base font-semibold">
+                        <i data-lucide="line-chart" class="size-4 text-muted-foreground"></i>
                         <span>Live Data</span>
                     </h2>
                 </header>
                 <section>
-                    <canvas id="liveChart" width="800" height="300"></canvas>
+                    <canvas id="liveChart" width="800" height="300" class="w-full h-[300px]"></canvas>
                 </section>
             </div>
 
             <!-- Active Workout -->
             <div class="card" id="activeWorkoutCard" style="display: none;">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i data-lucide="play-circle"></i>
-                        <span id="activeWorkoutName">Active Workout</span>
-                    </h2>
-                    <div class="workout-progress-time" id="workoutProgressTime">0:00 / 0:00</div>
-                </div>
-                <div class="card-content">
-                    <div class="active-interval-info">
-                        <div class="current-interval">
-                            <div class="interval-label">Current</div>
-                            <div class="interval-name" id="currentIntervalName">--</div>
-                            <div class="interval-target" id="currentIntervalTarget">--</div>
+                <header class="border-b border-border">
+                    <div class="flex items-center justify-between">
+                        <h2 class="flex items-center gap-2 text-base font-semibold">
+                            <i data-lucide="play-circle" class="size-4 text-muted-foreground"></i>
+                            <span id="activeWorkoutName">Active Workout</span>
+                        </h2>
+                        <div id="workoutProgressTime" class="text-sm font-semibold text-muted-foreground tabular-nums">0:00 / 0:00</div>
+                    </div>
+                </header>
+                <section class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 bg-muted border border-border rounded-md border-l-4 border-l-primary">
+                            <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Current</div>
+                            <div id="currentIntervalName" class="text-base font-bold text-foreground mb-1">--</div>
+                            <div id="currentIntervalTarget" class="text-sm text-muted-foreground tabular-nums">--</div>
                         </div>
-                        <div class="next-interval">
-                            <div class="interval-label">Next</div>
-                            <div class="interval-name" id="nextIntervalName">--</div>
-                            <div class="interval-target" id="nextIntervalTarget">--</div>
+                        <div class="p-4 bg-muted border border-border rounded-md border-l-4 border-l-muted-foreground">
+                            <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Next</div>
+                            <div id="nextIntervalName" class="text-base font-bold text-foreground mb-1">--</div>
+                            <div id="nextIntervalTarget" class="text-sm text-muted-foreground tabular-nums">--</div>
                         </div>
                     </div>
-                    <canvas id="workoutProgressChart" width="800" height="120"></canvas>
+                    <canvas id="workoutProgressChart" width="800" height="120" class="w-full h-[120px]"></canvas>
 
                     <!-- Session Participants (if in session) -->
-                    <div id="workoutParticipantsSection" style="display: none;">
-                        <div class="workout-participants-header">
-                            <i data-lucide="users"></i>
+                    <div id="workoutParticipantsSection" class="pt-6 border-t border-border" style="display: none;">
+                        <div class="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                            <i data-lucide="users" class="size-4"></i>
                             <span>Riding Together</span>
                         </div>
-                        <div id="workoutParticipantsList" class="workout-participants-list">
+                        <div id="workoutParticipantsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <!-- Participants will be rendered here -->
                         </div>
                     </div>
 
-                    <div class="workout-controls">
+                    <div class="flex justify-center mt-4">
                         <button onclick="workoutDesigner.stopWorkout()" id="stopWorkoutBtn" class="btn-lg-destructive">
                             <i data-lucide="square"></i>
                             <span>Stop Workout</span>
                         </button>
                     </div>
-                </div>
+                </section>
             </div>
 
             <!-- Workout Summary (after completion) -->
             <div class="card" id="workoutSummaryCard" style="display: none;">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i data-lucide="check-circle"></i>
+                <header class="border-b border-border">
+                    <h2 class="flex items-center gap-2 text-base font-semibold">
+                        <i data-lucide="check-circle" class="size-4 text-muted-foreground"></i>
                         <span>Workout Complete!</span>
                     </h2>
-                </div>
-                <div class="card-content">
-                    <div class="workout-summary-stats">
-                        <div class="summary-stat">
-                            <div class="summary-stat-label">Duration</div>
-                            <div class="summary-stat-value" id="summaryDuration">--</div>
+                </header>
+                <section class="space-y-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div class="p-4 bg-muted border border-border rounded-md text-center">
+                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Duration</div>
+                            <div id="summaryDuration" class="text-2xl font-bold text-foreground tabular-nums">--</div>
                         </div>
-                        <div class="summary-stat">
-                            <div class="summary-stat-label">Avg Power</div>
-                            <div class="summary-stat-value" id="summaryAvgPower">--</div>
+                        <div class="p-4 bg-muted border border-border rounded-md text-center">
+                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Avg Power</div>
+                            <div id="summaryAvgPower" class="text-2xl font-bold text-foreground tabular-nums">--</div>
                         </div>
-                        <div class="summary-stat">
-                            <div class="summary-stat-label">Max Power</div>
-                            <div class="summary-stat-value" id="summaryMaxPower">--</div>
+                        <div class="p-4 bg-muted border border-border rounded-md text-center">
+                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Max Power</div>
+                            <div id="summaryMaxPower" class="text-2xl font-bold text-foreground tabular-nums">--</div>
                         </div>
-                        <div class="summary-stat">
-                            <div class="summary-stat-label">Avg Cadence</div>
-                            <div class="summary-stat-value" id="summaryAvgCadence">--</div>
+                        <div class="p-4 bg-muted border border-border rounded-md text-center">
+                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Avg Cadence</div>
+                            <div id="summaryAvgCadence" class="text-2xl font-bold text-foreground tabular-nums">--</div>
                         </div>
-                        <div class="summary-stat">
-                            <div class="summary-stat-label">Total Work</div>
-                            <div class="summary-stat-value" id="summaryWork">--</div>
+                        <div class="p-4 bg-muted border border-border rounded-md text-center">
+                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Total Work</div>
+                            <div id="summaryWork" class="text-2xl font-bold text-foreground tabular-nums">--</div>
                         </div>
-                        <div class="summary-stat">
-                            <div class="summary-stat-label">Avg HR</div>
-                            <div class="summary-stat-value" id="summaryAvgHR">--</div>
+                        <div class="p-4 bg-muted border border-border rounded-md text-center">
+                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Avg HR</div>
+                            <div id="summaryAvgHR" class="text-2xl font-bold text-foreground tabular-nums">--</div>
                         </div>
                     </div>
 
-                    <div class="workout-summary-actions">
-                        <button onclick="app.downloadWorkoutTCX()" class="btn-lg">
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="app.downloadWorkoutTCX()" class="btn-lg flex-1">
                             <i data-lucide="upload"></i>
                             <span>Download TCX for Strava</span>
                         </button>
@@ -286,22 +289,22 @@
                         </button>
                     </div>
 
-                    <div class="workout-summary-help">
-                        <p><strong>Upload to Strava:</strong></p>
-                        <ol>
+                    <div class="p-4 bg-muted border-l-4 border-l-primary rounded-md space-y-2">
+                        <p class="text-sm text-muted-foreground"><strong class="text-foreground">Upload to Strava:</strong></p>
+                        <ol class="text-sm text-muted-foreground space-y-1 ml-5 list-decimal">
                             <li>Download the TCX file above</li>
-                            <li>Go to <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener">strava.com/upload/select</a></li>
+                            <li>Go to <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener" class="text-primary hover:underline">strava.com/upload/select</a></li>
                             <li>Upload the TCX file</li>
                             <li>Add title, description, and publish!</li>
                         </ol>
-                        <p>TCX files also work with Garmin Connect, TrainingPeaks, and most fitness platforms.</p>
+                        <p class="text-sm text-muted-foreground">TCX files also work with Garmin Connect, TrainingPeaks, and most fitness platforms.</p>
                     </div>
-                </div>
+                </section>
             </div>
         </div>
 
         <!-- Right Sidebar -->
-        <div class="dashboard-sidebar">
+        <div class="flex flex-col gap-6">
             <!-- Riders (when in session) -->
             <div class="card" x-show="$store.app.session.active" style="display: none;">
                 <header>
@@ -352,18 +355,18 @@
 
             <!-- Quick Control -->
             <div class="card">
-                <header>
-                    <h2 class="flex items-center gap-2">
-                        <i data-lucide="sliders"></i>
+                <header class="border-b border-border">
+                    <h2 class="flex items-center gap-2 text-base font-semibold">
+                        <i data-lucide="sliders" class="size-4 text-muted-foreground"></i>
                         <span>Quick Control</span>
                     </h2>
                 </header>
-                <section>
-                    <div class="grid gap-4">
-                        <div class="grid gap-2">
+                <section class="">
+                    <div class="space-y-4">
+                        <div class="space-y-2">
                             <label for="powerSlider" class="text-sm font-medium">Target Power</label>
-                            <div class="power-display text-3xl font-bold text-center py-2" id="powerDisplay">100W</div>
-                            <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.updatePowerDisplay()" class="w-full">
+                            <div id="powerDisplay" class="text-3xl font-bold text-center py-4 bg-muted border border-border rounded-md tabular-nums">100W</div>
+                            <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.updatePowerDisplay()" class="input w-full">
                         </div>
                         <button onclick="app.setPowerCommand()" id="setPowerBtn" disabled class="btn w-full">
                             <i data-lucide="send"></i>
@@ -391,15 +394,15 @@
 
             <!-- Activity Log -->
             <details class="card" open>
-                <summary class="flex items-center justify-between cursor-pointer p-6 border-b border-border">
-                    <h2 class="flex items-center gap-2">
-                        <i data-lucide="terminal"></i>
+                <summary class="flex justify-between cursor-pointer border-b border-border hover:bg-muted/30 transition-colors">
+                    <header class="flex items-center gap-2 text-base font-semibold">
+                        <i data-lucide="terminal" class="size-4 text-muted-foreground"></i>
                         <span>Activity Log</span>
-                    </h2>
-                    <i data-lucide="chevron-down" class="details-chevron w-5 h-5 text-muted-foreground transition-transform"></i>
+                    </header>
+                    <i data-lucide="chevron-down" class="chevron-rotate size-5 text-muted-foreground transition-transform"></i>
                 </summary>
-                <section>
-                    <div class="log" id="log"></div>
+                <section class="p-6">
+                    <div id="log" class="bg-background border border-border rounded-md font-mono text-xs p-3 h-[300px] overflow-y-auto leading-relaxed space-y-1"></div>
                 </section>
             </details>
         </div>
@@ -408,102 +411,102 @@
 
     <!-- Design Tab -->
     <div class="tab-content" id="content-design">
-        <div class="design-container">
-            <div class="design-header">
-                <h1 class="design-title">Workout Designer</h1>
-                <div class="ftp-input-group">
-                    <label for="ftpInput" class="ftp-label">FTP:</label>
-                    <input type="number" id="ftpInput" value="200" min="50" max="500" onchange="app.updateFTP()">
-                    <span class="ftp-unit">W</span>
+        <div class="max-w-[1600px] mx-auto p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-foreground">Workout Designer</h1>
+                <div class="flex items-center gap-2 bg-muted border border-border rounded-md px-3 py-2">
+                    <label for="ftpInput" class="text-sm text-muted-foreground font-medium">FTP:</label>
+                    <input type="number" id="ftpInput" value="200" min="50" max="500" onchange="app.updateFTP()" class="w-16 bg-transparent border-none text-sm font-semibold text-foreground text-center focus:outline-none focus:ring-2 focus:ring-ring rounded">
+                    <span class="text-xs text-muted-foreground">W</span>
                 </div>
             </div>
 
-            <div class="design-layout">
-                <div class="design-main">
+            <div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+                <div class="space-y-6">
                     <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i data-lucide="layout"></i>
+                        <header class="border-b border-border">
+                            <h2 class="flex items-center gap-2 text-base font-semibold">
+                                <i data-lucide="layout" class="size-4 text-muted-foreground"></i>
                                 <span>Build Your Workout</span>
                             </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="toolbar">
-                                <button onclick="workoutDesigner.addInterval('warmup')" class="btn btn-sm">
+                        </header>
+                        <section class="space-y-4">
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="workoutDesigner.addInterval('warmup')" class="btn-sm">
                                     <i data-lucide="sunrise"></i>
                                     <span>Warmup</span>
                                 </button>
-                                <button onclick="workoutDesigner.addInterval('endurance')" class="btn btn-sm">
+                                <button onclick="workoutDesigner.addInterval('endurance')" class="btn-sm">
                                     <i data-lucide="gauge"></i>
                                     <span>Endurance</span>
                                 </button>
-                                <button onclick="workoutDesigner.addInterval('tempo')" class="btn btn-sm">
+                                <button onclick="workoutDesigner.addInterval('tempo')" class="btn-sm">
                                     <i data-lucide="trending-up"></i>
                                     <span>Tempo</span>
                                 </button>
-                                <button onclick="workoutDesigner.addInterval('threshold')" class="btn btn-sm">
+                                <button onclick="workoutDesigner.addInterval('threshold')" class="btn-sm">
                                     <i data-lucide="flame"></i>
                                     <span>Threshold</span>
                                 </button>
-                                <button onclick="workoutDesigner.addInterval('vo2max')" class="btn btn-sm">
+                                <button onclick="workoutDesigner.addInterval('vo2max')" class="btn-sm">
                                     <i data-lucide="rocket"></i>
                                     <span>VO2 Max</span>
                                 </button>
-                                <button onclick="workoutDesigner.addInterval('cooldown')" class="btn btn-sm">
+                                <button onclick="workoutDesigner.addInterval('cooldown')" class="btn-sm">
                                     <i data-lucide="sunset"></i>
                                     <span>Cooldown</span>
                                 </button>
-                                <div class="toolbar-spacer"></div>
-                                <button onclick="workoutDesigner.clearWorkout()" class="btn btn-sm btn-ghost">
+                                <div class="flex-1"></div>
+                                <button onclick="workoutDesigner.clearWorkout()" class="btn-sm-ghost">
                                     <i data-lucide="trash-2"></i>
                                     <span>Clear</span>
                                 </button>
                             </div>
-                            <div id="workoutTimeline" class="workout-timeline"></div>
-                            <div class="workout-stats">
-                                <div class="stat">
-                                    <i data-lucide="clock"></i>
-                                    <span id="totalDuration">0:00</span>
+                            <div id="workoutTimeline" class="bg-muted border border-border rounded-md p-6 min-h-[180px]"></div>
+                            <div class="flex items-center gap-6 p-4 bg-muted border border-border rounded-md">
+                                <div class="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                                    <i data-lucide="clock" class="size-4"></i>
+                                    <span id="totalDuration" class="tabular-nums">0:00</span>
                                 </div>
-                                <div class="stat">
-                                    <i data-lucide="gauge"></i>
-                                    <span id="avgPower">0</span>W avg
+                                <div class="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                                    <i data-lucide="gauge" class="size-4"></i>
+                                    <span id="avgPower" class="tabular-nums">0</span>W avg
                                 </div>
-                                <div class="stat">
-                                    <i data-lucide="flame"></i>
-                                    <span id="totalWork">0</span>kJ
+                                <div class="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                                    <i data-lucide="flame" class="size-4"></i>
+                                    <span id="totalWork" class="tabular-nums">0</span>kJ
                                 </div>
                             </div>
-                        </div>
+                        </section>
                     </div>
                 </div>
 
-                <div class="design-sidebar">
+                <div class="space-y-4">
                     <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i data-lucide="save"></i>
+                        <header class="border-b border-border">
+                            <h2 class="flex items-center gap-2 text-base font-semibold">
+                                <i data-lucide="save" class="size-4 text-muted-foreground"></i>
                                 <span>Manage</span>
                             </h2>
-                        </div>
-                        <div class="card-content">
+                        </header>
+                        <section class="space-y-2">
                             <button onclick="app.saveWorkout()" class="btn w-full">
                                 <i data-lucide="save"></i>
                                 <span>Save Workout</span>
                             </button>
-                            <button onclick="app.exportWorkout()" class="btn w-full">
+                            <button onclick="app.exportWorkout()" class="btn-outline w-full">
                                 <i data-lucide="download"></i>
                                 <span>Export JSON</span>
                             </button>
-                            <button onclick="app.importWorkout()" class="btn w-full">
+                            <button onclick="app.importWorkout()" class="btn-outline w-full">
                                 <i data-lucide="upload"></i>
                                 <span>Import JSON</span>
                             </button>
-                            <button onclick="app.loadWorkoutForRide()" class="btn w-full">
+                            <button onclick="app.loadWorkoutForRide()" class="btn-outline w-full">
                                 <i data-lucide="play"></i>
                                 <span>Load & Ride</span>
                             </button>
-                        </div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -512,15 +515,15 @@
 
     <!-- Workouts Tab -->
     <div class="tab-content" id="content-workouts">
-        <div class="workouts-container">
-            <div class="workouts-header">
-                <h1 class="workouts-title">Workout Library</h1>
+        <div class="max-w-[1600px] mx-auto p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-foreground">Workout Library</h1>
                 <button onclick="app.importWorkout()" class="btn">
                     <i data-lucide="upload"></i>
                     <span>Import Workout</span>
                 </button>
             </div>
-            <div id="workoutLibrary" class="workout-library">
+            <div id="workoutLibrary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- Workout cards will be generated here -->
             </div>
         </div>
@@ -528,70 +531,72 @@
 
     <!-- Session Tab -->
     <div class="tab-content" id="content-session">
-        <div class="session-container">
-            <div class="session-header">
-                <h1 class="session-title">Ride with Friends</h1>
+        <div class="max-w-[1400px] mx-auto p-8">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-foreground mb-2">Ride with Friends</h1>
             </div>
 
             <!-- Not Connected State -->
-            <div id="sessionNotConnected" class="session-state">
-                <div class="session-intro">
-                    <i data-lucide="users" style="width: 64px; height: 64px; margin: 0 auto 1.5rem; color: var(--accent); opacity: 0.5;"></i>
-                    <h2>Train Together, Ride Stronger</h2>
-                    <p>Create or join a session to ride with friends. See each other's power, cadence, and race on the same workout!</p>
+            <div id="sessionNotConnected" class="space-y-6">
+                <div class="text-center p-12 bg-card border border-border rounded-lg mb-6">
+                    <i data-lucide="users" class="w-16 h-16 mx-auto mb-6 text-primary opacity-50"></i>
+                    <h2 class="text-xl font-bold text-foreground mb-2">Train Together, Ride Stronger</h2>
+                    <p class="text-base text-muted-foreground max-w-2xl mx-auto">Create or join a session to ride with friends. See each other's power, cadence, and race on the same workout!</p>
                 </div>
 
-                <div class="session-actions">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i data-lucide="plus-circle"></i>
+                        <header class="border-b border-border">
+                            <h2 class="flex items-center gap-2 text-base font-semibold">
+                                <i data-lucide="plus-circle" class="size-4 text-muted-foreground"></i>
                                 <span>Create Session</span>
                             </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="control-group">
-                                <label class="control-label">Your Name</label>
-                                <input type="text" id="hostNameInput" placeholder="Enter your name" value="Rider" class="text-input">
-                                <button onclick="app.createSession()" class="btn-lg w-full">
-                                    <i data-lucide="play-circle"></i>
-                                    <span>Create Session</span>
-                                </button>
+                        </header>
+                        <section class="space-y-4">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-muted-foreground">Your Name</label>
+                                <input type="text" id="hostNameInput" placeholder="Enter your name" value="Rider" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                             </div>
-                        </div>
+                            <button onclick="app.createSession()" class="btn-lg w-full">
+                                <i data-lucide="play-circle"></i>
+                                <span>Create Session</span>
+                            </button>
+                        </section>
                     </div>
 
                     <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i data-lucide="user-plus"></i>
+                        <header class="border-b border-border">
+                            <h2 class="flex items-center gap-2 text-base font-semibold">
+                                <i data-lucide="user-plus" class="size-4 text-muted-foreground"></i>
                                 <span>Join Session</span>
                             </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="control-group">
-                                <label class="control-label">Your Name</label>
-                                <input type="text" id="joinNameInput" placeholder="Enter your name" value="Rider" class="text-input">
-                                <label class="control-label">Session Code</label>
-                                <input type="text" id="sessionCodeInput" placeholder="e.g., swift-mountain-climbing-falcon" class="text-input">
-                                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">Paste the full session code from your friend</p>
-                                <button onclick="app.joinSession()" class="btn-lg w-full">
-                                    <i data-lucide="log-in"></i>
-                                    <span>Join Session</span>
-                                </button>
+                        </header>
+                        <section class="space-y-4">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-muted-foreground">Your Name</label>
+                                <input type="text" id="joinNameInput" placeholder="Enter your name" value="Rider" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                             </div>
-                        </div>
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-muted-foreground">Session Code</label>
+                                <input type="text" id="sessionCodeInput" placeholder="e.g., swift-mountain-climbing-falcon" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                <p class="text-xs text-muted-foreground">Paste the full session code from your friend</p>
+                            </div>
+                            <button onclick="app.joinSession()" class="btn-lg w-full">
+                                <i data-lucide="log-in"></i>
+                                <span>Join Session</span>
+                            </button>
+                        </section>
                     </div>
                 </div>
             </div>
 
             <!-- Connected State -->
-            <div id="sessionConnected" class="session-state" style="display: none;">
-                <div class="session-info-bar">
-                    <div class="session-code-display">
-                        <span class="label">Session Code:</span>
-                        <span class="code" id="sessionCodeDisplay">---</span>
-                        <button onclick="app.copySessionInfo()" class="btn btn-sm" title="Copy Session Code">
+            <div id="sessionConnected" class="space-y-6" style="display: none;">
+                <div class="flex items-center gap-4 bg-card border border-border rounded-lg">
+                    <div class="flex items-center gap-3 flex-1">
+                        <span class="text-sm text-muted-foreground font-medium">Session Code:</span>
+                        <code id="sessionCodeDisplay" class="px-3 py-1.5 bg-muted text-primary font-mono text-sm rounded-md">---</code>
+                        <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy Session Code">
                             <i data-lucide="copy"></i>
                         </button>
                     </div>
@@ -601,97 +606,95 @@
                     </button>
                 </div>
 
-                <!-- My FTP Settings -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">
-                            <i data-lucide="gauge"></i>
-                            <span>My FTP</span>
-                        </h2>
-                    </div>
-                    <div class="card-content">
-                        <div class="control-group">
-                            <label class="control-label">Your FTP (Watts)</label>
-                            <div class="ftp-control">
-                                <input type="number" id="sessionFtpInput" value="200" min="50" max="500" class="text-input" onchange="app.updateSessionFTP()">
-                                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">Workout will scale to your FTP. You can adjust this anytime!</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- My FTP Settings -->
+                    <div class="card">
+                        <header class="border-b border-border">
+                            <h2 class="flex items-center gap-2 text-base font-semibold">
+                                <i data-lucide="gauge" class="size-4 text-muted-foreground"></i>
+                                <span>My FTP</span>
+                            </h2>
+                        </header>
+                        <section class="space-y-4">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-muted-foreground">Your FTP (Watts)</label>
+                                <input type="number" id="sessionFtpInput" value="200" min="50" max="500" onchange="app.updateSessionFTP()" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                <p class="text-xs text-muted-foreground">Workout will scale to your FTP. You can adjust this anytime!</p>
                             </div>
-                        </div>
+                        </section>
                     </div>
-                </div>
 
-                <!-- Video Chat Section -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">
-                            <i data-lucide="video"></i>
-                            <span>Video Chat</span>
-                        </h2>
-                    </div>
-                    <div class="card-content">
-                        <div class="video-chat-info">
-                            <p>Connect with your friends via Google Meet:</p>
-                            <div class="control-group">
-                                <input type="text" id="meetLinkInput" placeholder="Paste Google Meet link" class="text-input">
+                    <!-- Video Chat Section -->
+                    <div class="card">
+                        <header class="border-b border-border">
+                            <h2 class="flex items-center gap-2 text-base font-semibold">
+                                <i data-lucide="video" class="size-4 text-muted-foreground"></i>
+                                <span>Video Chat</span>
+                            </h2>
+                        </header>
+                        <section class="space-y-4">
+                            <p class="text-sm text-muted-foreground">Connect with your friends via Google Meet:</p>
+                            <div class="space-y-2">
+                                <input type="text" id="meetLinkInput" placeholder="Paste Google Meet link" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                                 <button onclick="app.openMeetLink()" class="btn w-full">
                                     <i data-lucide="external-link"></i>
                                     <span>Open Google Meet</span>
                                 </button>
                             </div>
-                        </div>
+                        </section>
                     </div>
                 </div>
 
                 <!-- Race Track -->
                 <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">
-                            <i data-lucide="flag"></i>
+                    <header class="border-b border-border">
+                        <h2 class="flex items-center gap-2 text-base font-semibold">
+                            <i data-lucide="flag" class="size-4 text-muted-foreground"></i>
                             <span>Race Track</span>
                         </h2>
-                    </div>
-                    <div class="card-content">
-                        <canvas id="raceTrackCanvas" width="1000" height="300"></canvas>
-                    </div>
+                    </header>
+                    <section class="p-6">
+                        <canvas id="raceTrackCanvas" width="1000" height="300" class="w-full h-[300px] bg-muted rounded-md"></canvas>
+                    </section>
                 </div>
 
                 <!-- Participants List -->
                 <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">
-                            <i data-lucide="users"></i>
+                    <header class="border-b border-border">
+                        <h2 class="flex items-center gap-2 text-base font-semibold">
+                            <i data-lucide="users" class="size-4 text-muted-foreground"></i>
                             <span>Participants</span>
                         </h2>
-                    </div>
-                    <div class="card-content">
-                        <div id="participantsList" class="participants-list">
+                    </header>
+                    <section class="p-6">
+                        <div id="participantsList" class="space-y-3">
                             <!-- Participants will be rendered here -->
                         </div>
-                    </div>
+                    </section>
                 </div>
 
                 <!-- Session Controls (Host Only) -->
                 <div id="sessionHostControls" class="card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">
-                            <i data-lucide="settings"></i>
+                    <header class="border-b border-border">
+                        <h2 class="flex items-center gap-2 text-base font-semibold">
+                            <i data-lucide="settings" class="size-4 text-muted-foreground"></i>
                             <span>Host Controls</span>
                         </h2>
-                    </div>
-                    <div class="card-content">
-                        <div class="countdown-display" id="countdownDisplay" style="display: none;">
-                            <div class="countdown-number" id="countdownNumber">5</div>
-                            <div class="countdown-text">Get Ready!</div>
+                    </header>
+                    <section class="space-y-4">
+                        <div id="countdownDisplay" class="text-center p-8 bg-muted border-2 border-primary rounded-md" style="display: none;">
+                            <div id="countdownNumber" class="text-6xl font-bold text-primary tabular-nums mb-2">5</div>
+                            <div class="text-lg font-semibold text-muted-foreground uppercase tracking-wide">Get Ready!</div>
                         </div>
                         <button onclick="app.startSyncedWorkout()" id="startSyncedBtn" class="btn-lg w-full">
                             <i data-lucide="play"></i>
                             <span>Start Synchronized Workout (5s countdown)</span>
                         </button>
-                        <button onclick="app.endSyncedWorkout()" id="endSyncedBtn" class="btn-destructive w-full hidden mt-3">
+                        <button onclick="app.endSyncedWorkout()" id="endSyncedBtn" class="btn-destructive w-full hidden">
                             <i data-lucide="square"></i>
                             <span>End Workout for All</span>
                         </button>
-                    </div>
+                    </section>
                 </div>
             </div>
         </div>
@@ -715,6 +718,25 @@
         lucide.createIcons();
         // Draw workout previews after DOM is loaded
         setTimeout(() => WorkoutPreview.refreshAllPreviews(), 100);
+
+        // Initialize range sliders with Basecoat styling
+        (() => {
+            const sliders = document.querySelectorAll('input[type="range"].input');
+            if (!sliders) return;
+
+            const updateSlider = (el) => {
+                const min = parseFloat(el.min || 0);
+                const max = parseFloat(el.max || 100);
+                const value = parseFloat(el.value);
+                const percent = (max === min) ? 0 : ((value - min) / (max - min)) * 100;
+                el.style.setProperty('--slider-value', `${percent}%`);
+            };
+
+            sliders.forEach(slider => {
+                updateSlider(slider);
+                slider.addEventListener('input', (event) => updateSlider(event.target));
+            });
+        })();
     </script>
 </body>
 </html>
