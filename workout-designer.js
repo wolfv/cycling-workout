@@ -14,7 +14,9 @@ class WorkoutDesigner {
         this.onTargetPowerChange = null;
         this.onWorkoutStart = null;
         this.onWorkoutStop = null;
+        this.onIntensityScaleChange = null;
         this.ftp = 200; // Default FTP
+        this.intensityScale = this.loadIntensityScale();
 
         this.timelineEl = document.getElementById('workoutTimeline');
         this.setupTimeline();
@@ -22,6 +24,29 @@ class WorkoutDesigner {
 
         // Initialize progress visualizer
         this.progressVisualizer = null;
+    }
+
+    clampIntensity(scale) {
+        if (isNaN(scale)) return 1;
+        return Math.min(Math.max(scale, 0.5), 1.5);
+    }
+
+    loadIntensityScale() {
+        try {
+            const stored = localStorage.getItem('zwift_intensity_scale');
+            if (!stored) return 1;
+            const parsed = parseFloat(stored);
+            if (isNaN(parsed)) return 1;
+            return this.clampIntensity(parsed);
+        } catch (err) {
+            return 1;
+        }
+    }
+
+    notifyIntensityUpdate() {
+        if (typeof this.onIntensityScaleChange === 'function') {
+            this.onIntensityScaleChange(this.intensityScale);
+        }
     }
 
     setupTimeline() {
@@ -32,6 +57,64 @@ class WorkoutDesigner {
         this.ftp = ftp;
         this.render();
         this.updateWorkoutInfo();
+        this.notifyIntensityUpdate();
+    }
+
+    getIntervalPower(interval) {
+        if (!interval) return 0;
+        const powerType = interval.powerType || 'relative';
+        if (powerType === 'absolute') {
+            const base = interval.power || 0;
+            return Math.round(base * this.intensityScale);
+        }
+
+        const percentage = interval.percentage || 100;
+        return Math.round(this.ftp * this.intensityScale * (percentage / 100));
+    }
+
+    setIntensityScale(scale) {
+        const clamped = this.clampIntensity(scale);
+        const previous = this.intensityScale;
+        this.intensityScale = clamped;
+
+        try {
+            localStorage.setItem('zwift_intensity_scale', this.intensityScale.toFixed(2));
+        } catch (err) {
+            // Ignore persistence failures
+        }
+
+        this.render();
+        this.updateWorkoutInfo();
+
+        if (this.progressVisualizer) {
+            this.progressVisualizer.setIntensityScale(this.intensityScale);
+        }
+
+        if (this.isRunning) {
+            this.applyCurrentIntervalTarget(previous !== clamped);
+            this.updateProgress();
+        }
+
+        this.notifyIntensityUpdate();
+    }
+
+    applyCurrentIntervalTarget(logAdjustment = false) {
+        if (!this.isRunning || this.currentIntervalIndex < 0) return;
+
+        const currentInterval = this.intervals[this.currentIntervalIndex];
+        if (!currentInterval) return;
+
+        const power = this.getIntervalPower(currentInterval);
+
+        if (logAdjustment) {
+            const currentName = currentInterval.name || 'Interval';
+            this.ftms.log(`${currentName}: intensity ${Math.round(this.intensityScale * 100)}% → ${power}W`, 'info');
+        }
+
+        this.ftms.setTargetPower(power);
+        if (this.onTargetPowerChange) {
+            this.onTargetPowerChange(power);
+        }
     }
 
     addInterval(type) {
@@ -108,12 +191,14 @@ class WorkoutDesigner {
         let power, displayText;
         
         if (powerType === 'absolute') {
-            power = interval.power || 0;
-            displayText = `${power}W (Absolute)`;
+            const basePower = interval.power || 0;
+            power = this.getIntervalPower(interval);
+            displayText = `${basePower}W Absolute${this.intensityScale !== 1 ? ` → ${power}W` : ''}`;
         } else {
             const percentage = interval.percentage || 100;
-            power = Math.round(this.ftp * (percentage / 100));
-            displayText = `${percentage}% FTP`;
+            power = this.getIntervalPower(interval);
+            const scaledPercent = Math.round(percentage * this.intensityScale);
+            displayText = `${percentage}% FTP${this.intensityScale !== 1 ? ` → ${scaledPercent}%` : ''}`;
         }
 
         el.innerHTML = `
@@ -232,17 +317,7 @@ class WorkoutDesigner {
     updateWorkoutInfo() {
         const totalDuration = this.intervals.reduce((sum, i) => sum + i.duration, 0);
         const totalWork = this.intervals.reduce((sum, i) => {
-            // Calculate power based on powerType
-            const powerType = i.powerType || 'relative';
-            let power;
-            
-            if (powerType === 'absolute') {
-                power = i.power || 0;
-            } else {
-                const percentage = i.percentage || 100;
-                power = Math.round(this.ftp * (percentage / 100));
-            }
-            
+            const power = this.getIntervalPower(i);
             return sum + (power * i.duration);
         }, 0) / 1000; // kJ
         const avgPower = totalDuration > 0 ? Math.round(totalWork * 1000 / totalDuration) : 0;
@@ -272,7 +347,7 @@ class WorkoutDesigner {
 
         // Initialize progress visualizer
         this.progressVisualizer = new WorkoutProgressVisualizer('workoutProgressChart');
-        this.progressVisualizer.setWorkout(this.intervals, this.ftp);
+    this.progressVisualizer.setWorkout(this.intervals, this.ftp, this.intensityScale);
         this.progressVisualizer.start(this.workoutStartTime);
 
         // Start progress update loop (update every 100ms for smooth progress bar)
@@ -297,20 +372,17 @@ class WorkoutDesigner {
         this.intervalStartTime = Date.now();
         const interval = this.intervals[index];
         
-        // Calculate power based on powerType
         const powerType = interval.powerType || 'relative';
-        let power;
-        
+        const power = this.getIntervalPower(interval);
+        let powerDisplay;
         if (powerType === 'absolute') {
-            power = interval.power || 0;
+            const basePower = interval.power || 0;
+            powerDisplay = `${power}W (Absolute${this.intensityScale !== 1 ? ` from ${basePower}W` : ''})`;
         } else {
             const percentage = interval.percentage || 100;
-            power = Math.round(this.ftp * (percentage / 100));
+            const scaledPercent = Math.round(percentage * this.intensityScale);
+            powerDisplay = `${power}W (${percentage}% FTP${this.intensityScale !== 1 ? ` → ${scaledPercent}%` : ''})`;
         }
-
-        const powerDisplay = powerType === 'absolute' 
-            ? `${power}W (Absolute)` 
-            : `${power}W (${interval.percentage}% FTP)`;
         
         this.ftms.log(`${interval.name}: ${powerDisplay} for ${this.formatDuration(interval.duration)}`, 'info');
         this.render();
@@ -377,21 +449,12 @@ class WorkoutDesigner {
         // Update current interval info
         const currentInterval = this.intervals[this.currentIntervalIndex];
         if (currentInterval) {
-            // Calculate power based on powerType
-            const powerType = currentInterval.powerType || 'relative';
-            let power;
-            
-            if (powerType === 'absolute') {
-                power = currentInterval.power || 0;
-            } else {
-                const percentage = currentInterval.percentage || 100;
-                power = Math.round(this.ftp * (percentage / 100));
-            }
-            
+            const power = this.getIntervalPower(currentInterval);
+            const intensityPercent = Math.round(this.intensityScale * 100);
             const remaining = Math.max(0, currentInterval.duration - elapsedInInterval);
 
             document.getElementById('currentIntervalName').textContent = currentInterval.name;
-            document.getElementById('currentIntervalTarget').textContent = `${power}W (${this.formatDuration(Math.round(remaining))} left)`;
+            document.getElementById('currentIntervalTarget').textContent = `${power}W (${intensityPercent}% • ${this.formatDuration(Math.round(remaining))} left)`;
             
             // Show countdown when less than 10 seconds remaining
             const countdownEl = document.getElementById('currentIntervalCountdown');
@@ -407,19 +470,10 @@ class WorkoutDesigner {
         // Update next interval info
         const nextInterval = this.intervals[this.currentIntervalIndex + 1];
         if (nextInterval) {
-            // Calculate power for next interval
-            const powerType = nextInterval.powerType || 'relative';
-            let nextPower;
-            
-            if (powerType === 'absolute') {
-                nextPower = nextInterval.power || 0;
-            } else {
-                const percentage = nextInterval.percentage || 100;
-                nextPower = Math.round(this.ftp * (percentage / 100));
-            }
+            const nextPower = this.getIntervalPower(nextInterval);
             
             document.getElementById('nextIntervalName').textContent = nextInterval.name;
-            document.getElementById('nextIntervalTarget').textContent = `${nextPower}W for ${this.formatDuration(nextInterval.duration)}`;
+            document.getElementById('nextIntervalTarget').textContent = `${nextPower}W`;
         } else {
             document.getElementById('nextIntervalName').textContent = 'Finish';
             document.getElementById('nextIntervalTarget').textContent = 'Last interval!';

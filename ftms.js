@@ -360,11 +360,11 @@ class FTMSController {
                     // Debug: log raw bytes
                     const bytes = new Uint8Array(e.target.value.buffer);
                     const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    console.log('Cycling Power:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(4, '0'));
+                    // console.log('Cycling Power:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(4, '0'));
 
                     // Power is always at offset 2
                     const power = dv.getInt16(2, true);
-                    console.log('Power from Cycling Power Service at offset 2:', power, 'W');
+                    // console.log('Power from Cycling Power Service at offset 2:', power, 'W');
 
                     // Use Cycling Power Service as primary source for power
                     this.metrics.power = power;

@@ -1,3 +1,22 @@
+const HR_ZONE_COLOR_DEFAULT = '#666666';
+const HR_ZONE_BACKGROUNDS = {
+    0: 'rgba(100, 116, 139, 0.12)',
+    1: 'rgba(74, 222, 128, 0.16)',
+    2: 'rgba(34, 211, 238, 0.16)',
+    3: 'rgba(251, 191, 36, 0.16)',
+    4: 'rgba(251, 146, 60, 0.16)',
+    5: 'rgba(239, 68, 68, 0.16)'
+};
+
+const HR_ZONE_BORDERS = {
+    0: 'rgba(100, 116, 139, 0.35)',
+    1: 'rgba(74, 222, 128, 0.55)',
+    2: 'rgba(34, 211, 238, 0.55)',
+    3: 'rgba(251, 191, 36, 0.55)',
+    4: 'rgba(251, 146, 60, 0.55)',
+    5: 'rgba(239, 68, 68, 0.55)'
+};
+
 // Alpine.js Global Store for Zwift Hub Controller
 document.addEventListener('alpine:init', () => {
     Alpine.store('app', {
@@ -6,14 +25,17 @@ document.addEventListener('alpine:init', () => {
         connecting: false,
         deviceName: null,
 
-        // Metrics
-        metrics: {
-            power: 0,
-            cadence: 0,
-            heartRate: 0,
-            targetPower: '--',
-            status: '--'
-        },
+        // Metrics (flattened for better reactivity)
+        power: 0,
+        cadence: 0,
+        heartRate: 0,
+        heartRateZone: 0,
+        heartRateColor: HR_ZONE_COLOR_DEFAULT,
+        heartRateBackground: HR_ZONE_BACKGROUNDS[0],
+        heartRateBorder: HR_ZONE_BORDERS[0],
+        heartRateZoneName: 'No Data',
+        targetPower: '--',
+        status: '--',
 
         // Session state
         session: {
@@ -50,8 +72,24 @@ document.addEventListener('alpine:init', () => {
             this.connecting = connecting;
         },
 
-        updateMetric(key, value) {
-            this.metrics[key] = value;
+        updateMetrics(metrics) {
+            this.power = Math.max(0, metrics.power || 0);
+            this.cadence = Math.max(0, metrics.cadence || 0);
+            const hr = Math.max(0, Number(metrics.hr ?? metrics.heartRate ?? 0) || 0);
+            this.heartRate = hr;
+            this.applyHeartRateStyling(hr);
+        },
+
+        applyHeartRateStyling(hr = 0) {
+            const hasHRZones = typeof window !== 'undefined' && window.HRZones;
+            const normalizedHR = Math.max(0, Number(hr) || 0);
+            const zone = hasHRZones && normalizedHR > 0 ? HRZones.getZone(normalizedHR) : 0;
+
+            this.heartRateZone = zone;
+            this.heartRateColor = hasHRZones ? HRZones.getZoneColor(zone) : HR_ZONE_COLOR_DEFAULT;
+            this.heartRateZoneName = zone > 0 && hasHRZones ? HRZones.getZoneName(zone) : 'No Data';
+            this.heartRateBackground = HR_ZONE_BACKGROUNDS[zone] || HR_ZONE_BACKGROUNDS[0];
+            this.heartRateBorder = HR_ZONE_BORDERS[zone] || HR_ZONE_BORDERS[0];
         },
 
         setSession(sessionId, isHost, riderName) {
@@ -69,7 +107,23 @@ document.addEventListener('alpine:init', () => {
         },
 
         updateParticipants(participants) {
-            this.session.participants = participants;
+            const hasHRZones = typeof window !== 'undefined' && window.HRZones;
+
+            this.session.participants = (participants || []).map((participant) => {
+                const hr = Math.max(0, Number(participant.heartRate || 0));
+                const zone = hasHRZones && hr > 0 ? HRZones.getZone(hr) : 0;
+                const color = hasHRZones ? HRZones.getZoneColor(zone) : HR_ZONE_COLOR_DEFAULT;
+
+                return {
+                    ...participant,
+                    hrZone: zone,
+                    hrColor: color,
+                    hrBackground: HR_ZONE_BACKGROUNDS[zone] || HR_ZONE_BACKGROUNDS[0],
+                    hrBorder: HR_ZONE_BORDERS[zone] || HR_ZONE_BORDERS[0],
+                    zoneLabel: zone > 0 ? `Z${zone}` : '',
+                    isSelf: Boolean(participant.isSelf)
+                };
+            });
         },
 
         setWorkout(name, timeTotal) {

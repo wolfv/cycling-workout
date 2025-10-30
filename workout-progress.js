@@ -8,6 +8,7 @@ class WorkoutProgressVisualizer {
         this.intervalStartTime = 0;
         this.workoutStartTime = 0;
         this.ftp = 200;
+        this.intensityScale = 1;
 
         // Colors matching workout zones
         this.colorMap = {
@@ -32,9 +33,10 @@ class WorkoutProgressVisualizer {
         this.height = rect.height;
     }
 
-    setWorkout(intervals, ftp) {
+    setWorkout(intervals, ftp, intensityScale = 1) {
         this.intervals = intervals;
         this.ftp = ftp;
+        this.intensityScale = intensityScale;
         this.currentIntervalIndex = -1;
         this.draw();
     }
@@ -67,9 +69,9 @@ class WorkoutProgressVisualizer {
         const powers = this.intervals.map(i => {
             const powerType = i.powerType || 'relative';
             if (powerType === 'absolute') {
-                return i.power || 0;
+                return Math.round((i.power || 0) * this.intensityScale);
             } else {
-                return Math.round(this.ftp * ((i.percentage || 100) / 100));
+                return Math.round(this.ftp * this.intensityScale * ((i.percentage || 100) / 100));
             }
         });
         
@@ -165,6 +167,11 @@ class WorkoutProgressVisualizer {
         const g = parseInt(color.slice(3, 5), 16);
         const b = parseInt(color.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+
+    setIntensityScale(scale) {
+        this.intensityScale = Math.max(0.5, Math.min(1.5, scale || 1));
+        this.draw();
     }
 
     clear() {

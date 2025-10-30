@@ -4,6 +4,17 @@ class App {
         this.ftms = new FTMSController();
         this.chart = new LiveChart('liveChart', 120); // 2 minutes of data
         this.currentTab = 'ride';
+    this.quickControlMode = 'power';
+    this.manualTargetPower = 100;
+    this.activeIntensityPercent = 100;
+    this.pendingIntensityPercent = 100;
+        this.quickControlElements = {
+            slider: null,
+            display: null,
+            label: null,
+            button: null,
+            buttonText: null
+        };
 
         // Setup FTMS callbacks
         this.ftms.onLog = (msg, type) => this.log(msg, type);
@@ -11,12 +22,15 @@ class App {
 
         // Initialize workout designer
         window.workoutDesigner = new WorkoutDesigner(this.ftms);
+    const initialIntensityPercent = Math.max(50, Math.min(150, Math.round(window.workoutDesigner.intensityScale * 100)));
+    this.activeIntensityPercent = initialIntensityPercent;
+    this.pendingIntensityPercent = initialIntensityPercent;
         window.workoutDesigner.onTargetPowerChange = (power) => {
-            document.getElementById('targetPowerValue').textContent = power;
-            this.chart.setTargetPower(power);
+            this.updateTargetPowerUI(power);
         };
         window.workoutDesigner.onWorkoutStart = () => this.handleWorkoutStart();
         window.workoutDesigner.onWorkoutStop = () => this.handleWorkoutStop();
+        window.workoutDesigner.onIntensityScaleChange = (scale) => this.handleIntensityScaleChange(scale);
 
         // Initialize session manager
         this.sessionManager = new P2PSessionManager();
@@ -30,6 +44,9 @@ class App {
 
         // Initialize workout recorder
         this.workoutRecorder = new WorkoutRecorder();
+
+    // Initialize quick control UI
+    this.initQuickControl();
 
         // Metrics broadcast interval
         this.metricsBroadcastInterval = null;
@@ -115,8 +132,7 @@ class App {
                     Alpine.store('app').setConnected(true, this.ftms.device?.name);
                 }
                 this.startMetricsBroadcast();
-                // Enable Set Power button
-                document.getElementById('setPowerBtn').disabled = false;
+                this.updateQuickControlAvailability();
             }
         }, 1000);
     }
@@ -159,6 +175,10 @@ class App {
 
         this.currentTab = tab;
 
+        if (tab === 'ride' && this.chart) {
+            this.chart.resize();
+        }
+
         // Refresh workout library when switching to workouts tab
         if (tab === 'workouts') {
             this.refreshWorkoutLibrary();
@@ -180,10 +200,11 @@ class App {
     handleMetricsUpdate(metrics) {
         // Update Alpine store
         if (window.Alpine) {
-            const store = Alpine.store('app');
-            store.metrics.power = Math.max(0, metrics.power);
-            store.metrics.heartRate = metrics.hr || 0;
-            store.metrics.cadence = metrics.cadence || 0;
+            Alpine.store('app').updateMetrics({
+                power: Math.max(0, metrics.power || 0),
+                heartRate: metrics.hr || metrics.heartRate || 0,
+                cadence: metrics.cadence || 0
+            });
         }
 
         // Update chart
@@ -222,8 +243,7 @@ class App {
                 Alpine.store('app').setConnected(true, this.ftms.device?.name);
             }
             this.chart.clear();
-            // Enable Set Power button
-            document.getElementById('setPowerBtn').disabled = false;
+            this.updateQuickControlAvailability();
         } else {
             if (window.Alpine) {
                 Alpine.store('app').setConnecting(false);
@@ -236,8 +256,7 @@ class App {
         if (window.Alpine) {
             Alpine.store('app').setConnected(false);
         }
-        // Disable Set Power button
-        document.getElementById('setPowerBtn').disabled = true;
+        this.updateQuickControlAvailability();
 
         if (this.rampInterval) {
             clearTimeout(this.rampInterval);
@@ -249,6 +268,15 @@ class App {
     }
 
     handleWorkoutStart() {
+        this.setQuickControlMode('intensity');
+        this.handleIntensityScaleChange(window.workoutDesigner.intensityScale);
+
+        setTimeout(() => {
+            if (window.workoutDesigner && typeof window.workoutDesigner.applyCurrentIntervalTarget === 'function') {
+                window.workoutDesigner.applyCurrentIntervalTarget(true);
+            }
+        }, 0);
+
         // Show active workout card when workout starts
         document.getElementById('activeWorkoutCard').style.display = 'block';
         document.getElementById('activeWorkoutCard').classList.remove('hidden');
@@ -293,6 +321,9 @@ class App {
                 document.getElementById('workoutControlCard').classList.remove('hidden');
             }
         }
+
+        this.manualTargetPower = this.getCurrentTargetPower() || this.manualTargetPower;
+        this.setQuickControlMode('power');
 
         // Re-initialize icons
         setTimeout(() => lucide.createIcons(), 0);
@@ -466,20 +497,271 @@ class App {
         input.click();
     }
 
-    async setPowerCommand() {
-        const power = parseInt(document.getElementById('powerSlider').value);
+    initQuickControl() {
+        const slider = document.getElementById('powerSlider');
+        const display = document.getElementById('powerDisplay');
+        const label = document.getElementById('quickControlLabel');
+        const button = document.getElementById('setPowerBtn');
+
+        this.quickControlElements = {
+            slider,
+            display,
+            label,
+            button,
+            buttonText: button ? button.querySelector('span') : null
+        };
+
+        if (slider) {
+            const defaultValue = Number(slider.value);
+            if (Number.isFinite(defaultValue)) {
+                this.manualTargetPower = Math.max(0, Math.round(defaultValue));
+            }
+        }
+
+        this.setQuickControlMode(this.quickControlMode || 'power');
+        this.refreshQuickControlDisplay();
+        this.updateQuickControlAvailability();
+        this.handleIntensityScaleChange(window.workoutDesigner.intensityScale);
+    }
+
+    updateQuickControlAvailability() {
+        const button = this.quickControlElements?.button;
+        if (!button) return;
+        if (this.quickControlMode === 'intensity') {
+            button.disabled = true;
+            button.title = 'Intensity adjusts automatically while a workout is running.';
+            return;
+        }
+
+        const connected = this.ftms.isConnected();
+        button.disabled = !connected;
+        button.title = connected ? '' : 'Connect to your trainer to send a power command.';
+    }
+
+    setQuickControlMode(mode) {
+        this.quickControlMode = mode;
+
+        const elements = this.quickControlElements || {};
+        const slider = elements.slider;
+        const label = elements.label;
+        const buttonText = elements.buttonText;
+
+        if (!slider) {
+            return;
+        }
+
+        if (mode === 'intensity') {
+            const percentRaw = this.pendingIntensityPercent || Math.round(window.workoutDesigner.intensityScale * 100);
+            const percent = Math.max(50, Math.min(150, Number.isFinite(percentRaw) ? percentRaw : 100));
+            slider.min = '50';
+            slider.max = '150';
+            slider.step = '1';
+            slider.value = String(percent);
+            this.pendingIntensityPercent = percent;
+            if (label) label.textContent = 'Workout Intensity';
+            if (buttonText) buttonText.textContent = 'Intensity Auto-Adjusts';
+        } else {
+            const manualRaw = Number.isFinite(this.manualTargetPower) ? this.manualTargetPower : 100;
+            const manual = Math.max(0, Math.round(manualRaw));
+            slider.min = '0';
+            slider.max = '500';
+            slider.step = '1';
+            slider.value = String(manual);
+            if (label) label.textContent = 'Target Power';
+            if (buttonText) buttonText.textContent = 'Set Power';
+        }
+
+        this.refreshQuickControlDisplay();
+        this.updateQuickControlAvailability();
+    }
+
+    refreshQuickControlDisplay() {
+        const slider = this.quickControlElements?.slider;
+        if (!slider) return;
+
+        if (this.quickControlMode === 'intensity') {
+            const percent = Math.round(Number(slider.value));
+            this.updateQuickControlDisplayForIntensity(percent);
+        } else {
+            const power = Math.round(Number(slider.value));
+            this.updateQuickControlDisplayForPower(power);
+        }
+    }
+
+    updateQuickControlDisplayForPower(power) {
+        const display = this.quickControlElements?.display;
+        if (!display) return;
+
+        const normalized = Number.isFinite(power) ? Math.max(0, Math.round(power)) : (this.manualTargetPower || 0);
+        display.textContent = `${normalized}W`;
+    }
+
+    updateQuickControlDisplayForIntensity(percent, targetPower) {
+        const display = this.quickControlElements?.display;
+        if (!display) return;
+
+        const normalizedPercent = Number.isFinite(percent) ? Math.max(50, Math.min(150, Math.round(percent))) : (this.pendingIntensityPercent || 100);
+        const activePercent = Math.max(1, Math.round(this.activeIntensityPercent || normalizedPercent));
+        const baselineTarget = Number.isFinite(targetPower) ? Math.round(targetPower) : this.getCurrentTargetPower();
+
+        if (Number.isFinite(baselineTarget) && baselineTarget > 0) {
+            if (normalizedPercent === activePercent) {
+                display.textContent = `${normalizedPercent}% (${baselineTarget}W)`;
+            } else {
+                const projected = Math.round(baselineTarget * (normalizedPercent / activePercent));
+                display.textContent = `${normalizedPercent}% (${baselineTarget}W → ${projected}W)`;
+            }
+        } else {
+            display.textContent = `${normalizedPercent}%`;
+        }
+    }
+
+    handleQuickControlInput() {
+        const slider = this.quickControlElements?.slider;
+        if (!slider) return;
+
+        if (this.quickControlMode === 'intensity') {
+            const percent = Math.max(50, Math.min(150, Math.round(Number(slider.value))));
+            this.pendingIntensityPercent = percent;
+            slider.value = String(percent);
+            this.updateQuickControlDisplayForIntensity(percent);
+        } else {
+            const power = Math.round(Number(slider.value));
+            this.manualTargetPower = Math.max(0, power);
+            this.updateQuickControlDisplayForPower(power);
+        }
+    }
+
+    handleQuickControlCommit() {
+        const slider = this.quickControlElements?.slider;
+        if (!slider) return;
+
+        if (this.quickControlMode === 'intensity') {
+            const percent = Math.max(50, Math.min(150, Math.round(Number(slider.value))));
+            this.pendingIntensityPercent = percent;
+            slider.value = String(percent);
+            this.updateQuickControlDisplayForIntensity(percent);
+
+            if (percent === this.activeIntensityPercent) {
+                return;
+            }
+
+            const scale = percent / 100;
+            if (window.workoutDesigner && typeof window.workoutDesigner.setIntensityScale === 'function') {
+                this.log(`Adjusting workout intensity to ${percent}%`, 'info');
+                window.workoutDesigner.setIntensityScale(scale);
+            }
+        }
+    }
+
+    async handleQuickControlAction() {
+        const slider = this.quickControlElements?.slider;
+        if (!slider) return;
+
+        if (this.quickControlMode === 'intensity') {
+            const percent = Math.max(50, Math.min(150, Math.round(Number(slider.value))));
+            const scale = percent / 100;
+            this.pendingIntensityPercent = percent;
+            this.log(`Adjusting workout intensity to ${percent}%`, 'info');
+            window.workoutDesigner.setIntensityScale(scale);
+            this.updateQuickControlDisplayForIntensity(percent);
+            return;
+        }
+
+        const power = Math.max(0, Math.round(Number(slider.value)));
+        this.manualTargetPower = power;
+        await this.applyTargetPower(power);
+        this.updateQuickControlDisplayForPower(power);
+    }
+
+    async applyTargetPower(power) {
+        if (!this.ftms.isConnected()) {
+            this.log('Please connect to your trainer first', 'warning');
+            return;
+        }
+
         this.log(`Setting power to ${power}W...`, 'info');
 
         const success = await this.ftms.setTargetPower(power);
         if (success) {
-            document.getElementById('targetPowerValue').textContent = power;
-            this.chart.setTargetPower(power);
+            this.updateTargetPowerUI(power);
         }
     }
 
-    updatePowerDisplay() {
-        const power = document.getElementById('powerSlider').value;
-        document.getElementById('powerDisplay').textContent = `${power}W`;
+    updateTargetPowerUI(power) {
+        const normalized = Math.max(0, Math.round(Number(power) || 0));
+        const valueEl = document.getElementById('targetPowerValue');
+        if (valueEl) {
+            valueEl.textContent = normalized;
+        }
+
+        if (this.chart) {
+            this.chart.setTargetPower(normalized);
+        }
+
+        if (window.Alpine && typeof Alpine.store === 'function') {
+            try {
+                Alpine.store('app').setTargetPower(normalized);
+            } catch (_) {
+                // Ignore Alpine update failures
+            }
+        }
+
+        if (this.quickControlMode === 'intensity') {
+            this.updateQuickControlDisplayForIntensity(this.pendingIntensityPercent, normalized);
+        } else {
+            const slider = this.quickControlElements?.slider;
+            if (slider) {
+                slider.value = String(normalized);
+            }
+            this.manualTargetPower = normalized;
+            this.updateQuickControlDisplayForPower(normalized);
+        }
+    }
+
+    handleIntensityScaleChange(scale) {
+        const numericScale = Number(scale);
+        if (!Number.isFinite(numericScale)) return;
+
+        const clampedPercent = Math.max(50, Math.min(150, Math.round(numericScale * 100)));
+        this.activeIntensityPercent = clampedPercent;
+        this.pendingIntensityPercent = clampedPercent;
+
+        if (this.quickControlMode === 'intensity') {
+            const slider = this.quickControlElements?.slider;
+            if (slider) {
+                slider.value = String(clampedPercent);
+            }
+            this.updateQuickControlDisplayForIntensity(clampedPercent);
+        }
+    }
+
+    getCurrentTargetPower() {
+        if (window.Alpine && typeof Alpine.store === 'function') {
+            try {
+                const possible = Alpine.store('app').ui?.targetPower;
+                const numeric = Number(possible);
+                if (Number.isFinite(numeric) && numeric > 0) {
+                    return Math.round(numeric);
+                }
+            } catch (_) {
+                // Ignore Alpine access failures
+            }
+        }
+
+        const textValue = document.getElementById('targetPowerValue')?.textContent;
+        if (textValue) {
+            const parsed = parseInt(textValue, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+                return parsed;
+            }
+        }
+
+        if (this.chart && Number.isFinite(this.chart.currentTargetPower) && this.chart.currentTargetPower > 0) {
+            return Math.round(this.chart.currentTargetPower);
+        }
+
+        return null;
     }
 
     refreshWorkoutLibrary() {
@@ -782,25 +1064,34 @@ class App {
     }
 
     handleParticipantUpdate(participants) {
+        const myId = this.sessionManager?.myId;
+        const normalized = (participants || []).map((p) => ({
+            ...p,
+            isSelf: myId ? p.id === myId : Boolean(p.isSelf)
+        }));
+
         // Update Alpine store
         if (window.Alpine) {
-            Alpine.store('app').updateParticipants(participants);
+            Alpine.store('app').updateParticipants(normalized);
         }
+
+        const hasHRZones = typeof window !== 'undefined' && window.HRZones;
 
         // Update participants list in Session tab
         const listEl = document.getElementById('participantsList');
         if (listEl) {
-            if (participants.length === 0) {
+            if (normalized.length === 0) {
                 listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>';
             } else {
-                listEl.innerHTML = participants.map(p => {
-                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                listEl.innerHTML = normalized.map(p => {
+                    const hrColor = hasHRZones && p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
                     return `
                     <div class="participant-card ${p.isHost ? 'host' : ''}">
                         <div class="participant-info">
                             <div class="participant-name">
                                 ${p.name}
                                 ${p.isHost ? '<span class="host-badge">HOST</span>' : ''}
+                                ${p.isSelf ? '<span class="host-badge" style="background:#3b82f6; color:#fff;">YOU</span>' : ''}
                                 <span class="ftp-badge">${p.ftp}W FTP</span>
                             </div>
                             <div class="participant-metrics">
@@ -824,15 +1115,16 @@ class App {
         const workoutSectionEl = document.getElementById('workoutParticipantsSection');
 
         if (workoutListEl && workoutSectionEl) {
-            if (participants.length > 0) {
+            if (normalized.length > 0) {
                 workoutSectionEl.style.display = 'block';
-                workoutListEl.innerHTML = participants.map(p => {
-                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                workoutListEl.innerHTML = normalized.map(p => {
+                    const hrColor = hasHRZones && p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
                     return `
                     <div class="workout-participant-compact ${p.isHost ? 'host' : ''}">
                         <div class="workout-participant-name">
                             ${p.name}
                             ${p.isHost ? '<span class="host-badge-mini">HOST</span>' : ''}
+                            ${p.isSelf ? '<span class="host-badge-mini" style="background:#3b82f6;color:#fff;">YOU</span>' : ''}
                         </div>
                         <div class="workout-participant-stats">
                             <span class="stat-compact"><i data-lucide="zap"></i>${p.power}W</span>
@@ -851,17 +1143,18 @@ class App {
         const sidebarListEl = document.getElementById('ridersListSidebar');
 
         if (sidebarListEl) {
-            if (participants.length === 0) {
+            if (normalized.length === 0) {
                 sidebarListEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No riders</div>';
             } else {
-                sidebarListEl.innerHTML = participants.map(p => {
-                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
+                sidebarListEl.innerHTML = normalized.map(p => {
+                    const hrColor = hasHRZones && p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
                     return `
                     <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
                             <div style="font-weight: 500;">
                                 ${p.name}
                                 ${p.isHost ? '<span class="badge-secondary" style="font-size: 0.7rem; margin-left: 0.25rem;">HOST</span>' : ''}
+                                ${p.isSelf ? '<span class="badge-secondary" style="font-size: 0.7rem; margin-left: 0.25rem; background:#3b82f6; color:#fff;">YOU</span>' : ''}
                             </div>
                             <span style="font-size: 0.75rem; color: var(--muted-foreground);">${p.ftp}W</span>
                         </div>
@@ -879,7 +1172,7 @@ class App {
         setTimeout(() => lucide.createIcons(), 0);
 
         // Update race track
-        this.raceTrack.setParticipants(participants);
+    this.raceTrack.setParticipants(normalized);
         this.raceTrack.draw();
         
         // Update workout participants list if workout is active
@@ -927,6 +1220,7 @@ class App {
             countdownEl.style.display = 'block';
 
             let remaining = seconds;
+            countdownNum.textContent = remaining;
             const countdownInterval = setInterval(() => {
                 remaining--;
                 countdownNum.textContent = remaining;

@@ -22,10 +22,10 @@ class P2PSessionManager {
         this.signalingUrl = 'wss://zwift-signaling.w-vollprecht.workers.dev';
     }
 
-    async createSession(userName) {
+    async createSession(userName, existingSessionId = null) {
         this.isHost = true;
         this.userName = userName;
-        this.sessionId = this.generateSessionCode();
+        this.sessionId = existingSessionId || this.generateSessionCode();
 
         await this.connectToSignaling();
 
@@ -98,7 +98,10 @@ class P2PSessionManager {
             case 'id':
                 // Got our peer ID from signaling server
                 this.myPeerId = data.id;
-                this.isHost = data.isHost;
+                const serverHostFlag = typeof data.isHost === 'boolean' ? data.isHost : false;
+                if (!this.isHost) {
+                    this.isHost = serverHostFlag;
+                }
                 console.log('My peer ID:', this.myPeerId, 'isHost:', this.isHost);
 
                 // Add self as participant
@@ -117,8 +120,11 @@ class P2PSessionManager {
                 this.sendToSignaling({
                     type: 'join',
                     name: this.userName,
-                    ftp: 200
+                    ftp: 200,
+                    isHost: this.isHost
                 });
+
+                this.updateParticipants();
 
                 if (resolveConnection) {
                     resolveConnection();
@@ -400,6 +406,14 @@ class P2PSessionManager {
         }
     }
 
+    isConnected() {
+        return Boolean(this.sessionId);
+    }
+
+    getParticipants() {
+        return Array.from(this.participants.values());
+    }
+
     generateSessionCode() {
         // Generate memorable but secure session code
         // Format: adjective-noun-verb-animal (e.g., "swift-mountain-climbing-falcon")
@@ -515,9 +529,12 @@ class P2PSessionManager {
         const state = this.loadSessionState();
         if (!state) return null;
 
+        this.sharedWorkout = state.workout || null;
+        this.isHost = Boolean(state.isHost);
+
         try {
             if (state.isHost) {
-                return await this.createSession(state.userName);
+                return await this.createSession(state.userName, state.sessionId);
             } else {
                 return await this.joinSession(state.sessionId, state.userName);
             }

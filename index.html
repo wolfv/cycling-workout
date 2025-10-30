@@ -12,7 +12,7 @@
     <script src="alpine-store.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="{}">
     <!-- Sidebar Navigation -->
     <aside class="sidebar" data-side="left" aria-hidden="false">
         <nav aria-label="Main navigation">
@@ -23,7 +23,7 @@
                             <i data-lucide="bike" class="w-7 h-7 text-accent"></i>
                             <h2 class="text-xl font-semibold">Zwift Hub</h2>
                         </div>
-                        <div class="flex flex-col gap-2" x-data>
+                        <div class="flex flex-col gap-2" x-data="{}">
                             <button
                                 onclick="app.connect()"
                                 x-show="!$store.app.connected && !$store.app.connecting"
@@ -59,6 +59,21 @@
                             </a>
                         </li>
                         <li>
+                        <!-- Group Countdown -->
+                        <div id="countdownDisplay" class="ride-countdown" style="display: none;">
+                            <div class="ride-countdown-card">
+                                <div class="ride-countdown-heading">
+                                    <i data-lucide="alarm-clock" class="size-4"></i>
+                                    <span>Group Start In</span>
+                                </div>
+                                <div class="ride-countdown-timer">
+                                    <span id="countdownNumber">5</span>
+                                    <small>s</small>
+                                </div>
+                                <p>Stay ready – the workout begins automatically.</p>
+                            </div>
+                        </div>
+
                             <a href="#" onclick="app.switchTab('design'); return false;" id="nav-design">
                                 <i data-lucide="pencil"></i>
                                 <span>Design Workout</span>
@@ -142,23 +157,38 @@
                         <i data-lucide="zap" class="size-4 text-muted-foreground"></i>
                         <span class="text-sm text-muted-foreground font-medium">Power</span>
                     </div>
-                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.power || '--'"></div>
+                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.power"></div>
                     <div class="text-xs text-muted-foreground uppercase tracking-wide">watts</div>
                 </div>
-                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="heart" class="size-4 text-muted-foreground"></i>
-                        <span class="text-sm text-muted-foreground font-medium">Heart Rate</span>
+                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:shadow-sm"
+                    :style="{ backgroundColor: $store.app.heartRateBackground, borderColor: $store.app.heartRateBorder }">
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="heart" class="size-4 text-muted-foreground"></i>
+                            <span class="text-sm text-muted-foreground font-medium">Heart Rate</span>
+                        </div>
+                        <span class="text-[0.65rem] font-semibold uppercase tracking-wide px-2 py-1 rounded-full text-white"
+                            x-show="$store.app.heartRateZone > 0"
+                            style="display: none;"
+                            :style="{ backgroundColor: $store.app.heartRateColor }"
+                            x-text="'Zone ' + $store.app.heartRateZone"></span>
                     </div>
-                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.heartRate"></div>
-                    <div class="text-xs text-muted-foreground uppercase tracking-wide">bpm</div>
+                    <div class="text-3xl font-bold mb-1 tabular-nums"
+                        :style="{ color: $store.app.heartRateZone > 0 ? $store.app.heartRateColor : 'inherit' }"
+                        x-text="$store.app.heartRate || '--'"></div>
+                    <div class="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                        <span>bpm</span>
+                        <span class="text-[0.65rem] font-medium capitalize text-muted-foreground"
+                            x-show="$store.app.heartRateZoneName"
+                            x-text="$store.app.heartRateZoneName"></span>
+                    </div>
                 </div>
                 <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="gauge" class="size-4 text-muted-foreground"></i>
                         <span class="text-sm text-muted-foreground font-medium">Cadence</span>
                     </div>
-                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.metrics.cadence"></div>
+                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.cadence"></div>
                     <div class="text-xs text-muted-foreground uppercase tracking-wide">rpm</div>
                 </div>
                 <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
@@ -176,6 +206,41 @@
                     </div>
                     <div class="text-2xl font-bold text-foreground mb-1" x-text="$store.app.connectionStatus"></div>
                     <div class="text-xs text-muted-foreground uppercase tracking-wide">connection</div>
+                </div>
+            </div>
+
+            <!-- Live Participants Strip -->
+            <div class="card participants-strip" x-show="$store.app.session.active && $store.app.session.participants.length" style="display: none;">
+                <div class="participants-strip-header">
+                    <div class="participants-strip-title">
+                        <i data-lucide="users" class="size-4"></i>
+                        <span>Riders Live</span>
+                        <span class="participants-strip-count" x-text="$store.app.session.participants.length"></span>
+                    </div>
+                    <span class="participants-strip-status" x-text="$store.app.session.isHost ? 'You are the host' : 'Following host cues'"></span>
+                </div>
+                <div class="participants-strip-list" id="participantsStrip">
+                    <template x-for="participant in $store.app.session.participants" :key="participant.id">
+                        <div class="participant-pill" :class="{ 'participant-pill-host': participant.isHost, 'participant-pill-self': participant.isSelf }"
+                            :style="{ backgroundColor: participant.hrBackground, borderColor: participant.hrBorder }">
+                            <div class="participant-pill-header">
+                                <span class="participant-pill-name" x-text="participant.name"></span>
+                                <span class="participant-pill-zone" x-show="participant.zoneLabel" style="display: none;"
+                                    :style="{ backgroundColor: participant.hrColor }"
+                                    x-text="participant.zoneLabel"></span>
+                            </div>
+                            <div class="participant-pill-metrics">
+                                <span><i data-lucide="zap" class="size-3"></i><span x-text="participant.power"></span><small>W</small></span>
+                                <span><i data-lucide="gauge" class="size-3"></i><span x-text="participant.cadence"></span><small>rpm</small></span>
+                                <span><i data-lucide="heart" class="size-3"></i><span x-text="participant.heartRate || '--'"></span><small>bpm</small></span>
+                            </div>
+                            <div class="participant-pill-meta">
+                                <span class="participant-pill-ftp" x-text="participant.ftp + 'W FTP'"></span>
+                                <span class="participant-pill-role host" x-show="participant.isHost" style="display: none;">Host</span>
+                                <span class="participant-pill-role you" x-show="participant.isSelf" style="display: none;">You</span>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -362,11 +427,11 @@
                 <section class="">
                     <div class="space-y-4">
                         <div class="space-y-2">
-                            <label for="powerSlider" class="text-sm font-medium">Target Power</label>
+                            <label for="powerSlider" id="quickControlLabel" class="text-sm font-medium">Target Power</label>
                             <div id="powerDisplay" class="text-3xl font-bold text-center py-4 bg-muted border border-border rounded-md tabular-nums">100W</div>
-                            <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.updatePowerDisplay()" class="input w-full">
+                            <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.handleQuickControlInput()" onchange="app.handleQuickControlCommit()" class="input w-full">
                         </div>
-                        <button onclick="app.setPowerCommand()" id="setPowerBtn" disabled class="btn w-full">
+                        <button onclick="app.handleQuickControlAction()" id="setPowerBtn" disabled class="btn w-full">
                             <i data-lucide="send"></i>
                             <span>Set Power</span>
                         </button>
@@ -399,16 +464,27 @@
             </div>
 
             <!-- Activity Log -->
-            <details class="card" open>
-                <summary class="flex justify-between cursor-pointer border-b border-border hover:bg-muted/30 transition-colors">
-                    <header class="flex items-center gap-2 text-base font-semibold">
-                        <i data-lucide="terminal" class="size-4 text-muted-foreground"></i>
-                        <span>Activity Log</span>
-                    </header>
-                    <i data-lucide="chevron-down" class="chevron-rotate size-5 text-muted-foreground transition-transform"></i>
+            <details class="card activity-log-card" open>
+                <summary class="activity-log-header" aria-label="Toggle activity log">
+                    <div class="activity-log-title">
+                        <div class="activity-log-icon">
+                            <i data-lucide="terminal" class="size-4"></i>
+                        </div>
+                        <div class="activity-log-text">
+                            <span class="activity-log-heading">Activity Log</span>
+                            <span class="activity-log-subheading">Live events and connection updates</span>
+                        </div>
+                    </div>
+                    <div class="activity-log-actions">
+                        <span class="badge badge-success activity-log-live">
+                            <span class="activity-log-live-dot"></span>
+                            Live
+                        </span>
+                        <i data-lucide="chevron-down" class="chevron-rotate size-5"></i>
+                    </div>
                 </summary>
-                <section class="p-6">
-                    <div id="log" class="bg-background border border-border rounded-md font-mono text-xs p-3 h-[300px] overflow-y-auto leading-relaxed space-y-1"></div>
+                <section class="activity-log-body">
+                    <div id="log" class="activity-log-stream"></div>
                 </section>
             </details>
         </div>
