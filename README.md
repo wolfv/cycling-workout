@@ -2,17 +2,11 @@
 
 A professional, dark-themed dashboard for controlling smart trainers using the FTMS (Fitness Machine Service) protocol via Web Bluetooth. Supports Zwift Hub, Wahoo KICKR, Tacx NEO, Elite, and many more!
 
-🌐 **[Try it live!](https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/)** (Replace with your GitHub Pages URL after deployment)
+🌐 **[Try it live!](https://wolfv.github.io/cycling-workout/)** (Replace with your GitHub Pages URL after deployment)
 
-[![Deploy to GitHub Pages](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/actions/workflows/deploy.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/actions/workflows/deploy.yml)
+[![Deploy to GitHub Pages](https://wolfv.github.io/cycling-workout/actions/workflows/deploy.yml/badge.svg)](https://wolfv.github.io/cycling-workout/actions/workflows/deploy.yml)
 
 ## Features
-
-### 🎨 Professional Dashboard Design
-- **Dark theme** with minimal, shadcn-inspired design
-- **Single-page layout** with main content and sidebar
-- **Lucide icons** for a modern, professional look
-- **Fully responsive** layout
 
 ### 📊 Real-time Monitoring
 - Live power, heart rate, and **cadence (RPM)** display
@@ -51,49 +45,12 @@ A professional, dark-themed dashboard for controlling smart trainers using the F
 - **Ride with friends** in real-time using peer-to-peer connections
 - **Workout sharing** - host sends workout to all participants
 - **Individual FTP scaling** - everyone rides at their own intensity
-- **Live race track** - see everyone's position on the workout timeline
 - **Real-time metrics** - view power, cadence, and FTP for all riders
-- **Session persistence** - survives page refreshes
-- **Google Meet integration** - video chat while riding
 - **Synchronized start** - countdown ensures everyone starts together
 
 ## Supported Devices
 
-This app works with **any smart trainer that supports FTMS (Fitness Machine Service)** via Bluetooth. Tested and confirmed with:
-
-### ✅ Zwift
-- Zwift Hub
-- Zwift Hub One
-
-### ✅ Wahoo
-- KICKR (all generations)
-- KICKR CORE
-- KICKR SNAP
-- KICKR BIKE
-
-### ✅ Tacx
-- Tacx NEO (Smart, 2T, 2T Plus, 3M)
-- Tacx Flux (S, 2)
-- Tacx Genius
-- Other Tacx FTMS trainers
-
-### ✅ Elite
-- Elite DRIVO (I, II)
-- Elite DIRETO (X, XR, XR-T)
-- Elite SUITO (T)
-- Elite JUSTO
-- Other Elite FTMS trainers
-
-### ✅ Saris
-- Saris H3
-- Saris H2 (with FTMS firmware)
-- Saris M2
-
-### ✅ Other Brands
-- JetBlack VOLT
-- Kinetic ROCK AND ROLL
-- Bkool trainers
-- Wattbike Atom
+This app works with **any smart trainer that supports FTMS (Fitness Machine Service)** via Bluetooth. Tested and confirmed with Zwift Hub and Wahoo Kickr.
 
 **Note:** Your trainer must support FTMS protocol. Most modern smart trainers (2017+) support this standard.
 
@@ -125,7 +82,7 @@ The app is automatically deployed to GitHub Pages via GitHub Actions.
    git add .
    git commit -m "Initial commit: Zwift Hub Controller"
    git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   git remote add origin https://github.com/wolfv/cycling-workout
    git push -u origin main
    ```
 
@@ -138,7 +95,7 @@ The app is automatically deployed to GitHub Pages via GitHub Actions.
 4. **Wait for deployment:**
    - The GitHub Action will automatically run
    - Check the **Actions** tab to see deployment progress
-   - Once complete, your site will be live at: `https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/`
+   - Once complete, your site will be live at: `https://wolfv.github.io/cycling-workout`
 
 5. **Update the README** with your actual URL
 
@@ -215,25 +172,6 @@ The app is automatically deployed to GitHub Pages via GitHub Actions.
 - Control Point characteristic (UUID: 0x2AD9)
 - Direct power target commands
 - No DirCon wrapper needed
-
-## Color Scheme
-
-- Background: `#0a0a0a`, `#18181b`, `#27272a`
-- Borders: `#3f3f46`, `#52525b`
-- Text: `#fafafa`, `#a1a1aa`, `#71717a`
-- Accent: `#3b82f6` (blue)
-- Success: `#22c55e` (green)
-- Danger: `#ef4444` (red)
-- Warning: `#f59e0b` (amber)
-
-## Interval Color Coding
-
-- **Warmup**: Amber accent
-- **Endurance**: Blue accent
-- **Tempo**: Green accent
-- **Threshold**: Red accent
-- **VO2 Max**: Purple accent
-- **Cooldown**: Indigo accent
 
 ## License
 
