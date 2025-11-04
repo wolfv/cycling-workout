@@ -1111,7 +1111,14 @@ class App {
         this.raceTrack.setWorkout(window.workoutDesigner.intervals, window.workoutDesigner.ftp);
 
         // Start synchronized countdown
-        this.sessionManager.startSynchronizedWorkout(5);
+        const countdownSeconds = 5;
+        const startTime = Date.now() + (countdownSeconds * 1000);
+
+        // Broadcast to others
+        this.sessionManager.startSynchronizedWorkout(countdownSeconds);
+
+        // Also trigger countdown for host
+        this.handleSessionStart(startTime);
     }
 
     updateSessionFTP() {

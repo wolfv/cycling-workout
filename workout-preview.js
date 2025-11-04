@@ -17,7 +17,10 @@ class WorkoutPreview {
         // Calculate power for each interval based on type
         const powers = intervals.map(i => {
             const powerType = i.powerType || 'relative';
-            if (powerType === 'absolute') {
+            if (powerType === 'ramp') {
+                // For ramps, use the high value for max calculation
+                return Math.round(ftp * ((i.percentageHigh || 100) / 100));
+            } else if (powerType === 'absolute') {
                 return i.power || 0;
             } else {
                 return Math.round(ftp * ((i.percentage || 100) / 100));
@@ -40,12 +43,33 @@ class WorkoutPreview {
 
         let x = 0;
         intervals.forEach((interval, index) => {
-            const power = powers[index];
+            const powerType = interval.powerType || 'relative';
             const barWidth = (interval.duration / totalDuration) * width;
-            const barHeight = (power / maxPower) * height;
+            const color = colorMap[interval.type] || '#71717a';
 
-            ctx.fillStyle = colorMap[interval.type] || '#71717a';
-            ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+            if (powerType === 'ramp') {
+                // Draw ramp as a trapezoid
+                const powerLow = Math.round(ftp * ((interval.percentageLow || 50) / 100));
+                const powerHigh = Math.round(ftp * ((interval.percentageHigh || 100) / 100));
+                const barHeightLow = (powerLow / maxPower) * height;
+                const barHeightHigh = (powerHigh / maxPower) * height;
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(x, height - barHeightLow);
+                ctx.lineTo(x + barWidth, height - barHeightHigh);
+                ctx.lineTo(x + barWidth, height);
+                ctx.lineTo(x, height);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // Draw regular interval as rectangle
+                const power = powers[index];
+                const barHeight = (power / maxPower) * height;
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+            }
 
             x += barWidth;
         });

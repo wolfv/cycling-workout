@@ -60,9 +60,19 @@ class WorkoutDesigner {
         this.notifyIntensityUpdate();
     }
 
-    getIntervalPower(interval) {
+    getIntervalPower(interval, elapsedSeconds = 0) {
         if (!interval) return 0;
         const powerType = interval.powerType || 'relative';
+
+        // Handle ramp intervals
+        if (powerType === 'ramp') {
+            const percentageLow = interval.percentageLow || 50;
+            const percentageHigh = interval.percentageHigh || 100;
+            const progress = Math.min(1, elapsedSeconds / interval.duration);
+            const currentPercentage = percentageLow + (percentageHigh - percentageLow) * progress;
+            return Math.round(this.ftp * this.intensityScale * (currentPercentage / 100));
+        }
+
         if (powerType === 'absolute') {
             const base = interval.power || 0;
             return Math.round(base * this.intensityScale);
@@ -371,11 +381,15 @@ class WorkoutDesigner {
         this.currentIntervalIndex = index;
         this.intervalStartTime = Date.now();
         const interval = this.intervals[index];
-        
+
         const powerType = interval.powerType || 'relative';
-        const power = this.getIntervalPower(interval);
+        const power = this.getIntervalPower(interval, 0);
         let powerDisplay;
-        if (powerType === 'absolute') {
+        if (powerType === 'ramp') {
+            const percentageLow = interval.percentageLow || 50;
+            const percentageHigh = interval.percentageHigh || 100;
+            powerDisplay = `Ramp from ${percentageLow}% to ${percentageHigh}% FTP`;
+        } else if (powerType === 'absolute') {
             const basePower = interval.power || 0;
             powerDisplay = `${power}W (Absolute${this.intensityScale !== 1 ? ` from ${basePower}W` : ''})`;
         } else {
@@ -383,12 +397,24 @@ class WorkoutDesigner {
             const scaledPercent = Math.round(percentage * this.intensityScale);
             powerDisplay = `${power}W (${percentage}% FTP${this.intensityScale !== 1 ? ` → ${scaledPercent}%` : ''})`;
         }
-        
+
         this.ftms.log(`${interval.name}: ${powerDisplay} for ${this.formatDuration(interval.duration)}`, 'info');
         this.render();
         this.updateProgress();
 
-        // Set target power
+        // For ramp intervals, continuously update power
+        if (powerType === 'ramp') {
+            this.rampUpdateInterval = setInterval(() => {
+                const elapsed = (Date.now() - this.intervalStartTime) / 1000;
+                const currentPower = this.getIntervalPower(interval, elapsed);
+                this.ftms.setTargetPower(currentPower);
+                if (this.onTargetPowerChange) {
+                    this.onTargetPowerChange(currentPower);
+                }
+            }, 1000); // Update every second
+        }
+
+        // Set initial target power
         await this.ftms.setTargetPower(power);
         if (this.onTargetPowerChange) {
             this.onTargetPowerChange(power);
@@ -396,6 +422,10 @@ class WorkoutDesigner {
 
         // Wait for interval duration
         this.workoutTimer = setTimeout(() => {
+            if (this.rampUpdateInterval) {
+                clearInterval(this.rampUpdateInterval);
+                this.rampUpdateInterval = null;
+            }
             this.executeInterval(index + 1);
         }, interval.duration * 1000);
     }
@@ -409,6 +439,11 @@ class WorkoutDesigner {
         if (this.progressUpdateInterval) {
             clearInterval(this.progressUpdateInterval);
             this.progressUpdateInterval = null;
+        }
+
+        if (this.rampUpdateInterval) {
+            clearInterval(this.rampUpdateInterval);
+            this.rampUpdateInterval = null;
         }
 
         this.isRunning = false;
@@ -630,8 +665,12 @@ class WorkoutDesigner {
                     
                     // Determine power type and validate
                     const powerType = interval.powerType || (interval.power !== undefined ? 'absolute' : 'relative');
-                    
-                    if (powerType === 'absolute') {
+
+                    if (powerType === 'ramp') {
+                        if (typeof interval.percentageLow !== 'number' || typeof interval.percentageHigh !== 'number') {
+                            throw new Error(`Interval ${index + 1}: ramp intervals require percentageLow and percentageHigh values`);
+                        }
+                    } else if (powerType === 'absolute') {
                         if (!interval.power || typeof interval.power !== 'number') {
                             throw new Error(`Interval ${index + 1}: missing or invalid power value for absolute power type`);
                         }
@@ -640,16 +679,26 @@ class WorkoutDesigner {
                             throw new Error(`Interval ${index + 1}: missing or invalid percentage value for relative power type`);
                         }
                     }
-                    
+
                     // Normalize interval with defaults
-                    return {
+                    const normalized = {
                         id: Date.now() + Math.random(),
                         name: interval.name || `Interval ${index + 1}`,
                         type: interval.type || 'custom',
                         duration: interval.duration,
-                        powerType: powerType,
-                        ...(powerType === 'absolute' ? { power: interval.power } : { percentage: interval.percentage })
+                        powerType: powerType
                     };
+
+                    if (powerType === 'ramp') {
+                        normalized.percentageLow = interval.percentageLow;
+                        normalized.percentageHigh = interval.percentageHigh;
+                    } else if (powerType === 'absolute') {
+                        normalized.power = interval.power;
+                    } else {
+                        normalized.percentage = interval.percentage;
+                    }
+
+                    return normalized;
                 });
 
                 this.intervals = validIntervals;

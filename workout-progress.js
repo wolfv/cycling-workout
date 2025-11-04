@@ -68,20 +68,23 @@ class WorkoutProgressVisualizer {
         // Calculate power for each interval based on type
         const powers = this.intervals.map(i => {
             const powerType = i.powerType || 'relative';
-            if (powerType === 'absolute') {
+            if (powerType === 'ramp') {
+                // For ramps, use the high value for max calculation
+                return Math.round(this.ftp * this.intensityScale * ((i.percentageHigh || 100) / 100));
+            } else if (powerType === 'absolute') {
                 return Math.round((i.power || 0) * this.intensityScale);
             } else {
                 return Math.round(this.ftp * this.intensityScale * ((i.percentage || 100) / 100));
             }
         });
-        
+
         const maxPower = Math.max(...powers);
 
         let x = 0;
         this.intervals.forEach((interval, index) => {
-            const power = powers[index];
+            const powerType = interval.powerType || 'relative';
             const barWidth = (interval.duration / totalDuration) * width;
-            const barHeight = (power / maxPower) * (height - 30); // Leave space for labels
+            const power = powers[index];
 
             // Determine color and opacity
             let color = this.colorMap[interval.type] || '#71717a';
@@ -89,37 +92,83 @@ class WorkoutProgressVisualizer {
 
             if (this.currentIntervalIndex !== -1) {
                 if (index < this.currentIntervalIndex) {
-                    // Completed - dimmed
-                    opacity = 0.3;
+                    opacity = 0.3; // Completed - dimmed
                 } else if (index === this.currentIntervalIndex) {
-                    // Current - highlighted
-                    opacity = 1;
-                    // Draw progress bar within segment
-                    if (elapsedInInterval > 0 && interval.duration > 0) {
-                        const progress = Math.min(elapsedInInterval / interval.duration, 1);
-                        const progressWidth = barWidth * progress;
-
-                        // Draw completed portion brighter
-                        ctx.fillStyle = this.adjustOpacity(color, 1);
-                        ctx.fillRect(x, height - barHeight - 30, progressWidth, barHeight);
-
-                        // Draw remaining portion dimmed
-                        ctx.fillStyle = this.adjustOpacity(color, 0.5);
-                        ctx.fillRect(x + progressWidth, height - barHeight - 30, barWidth - progressWidth, barHeight);
-                    } else {
-                        ctx.fillStyle = this.adjustOpacity(color, opacity);
-                        ctx.fillRect(x, height - barHeight - 30, barWidth, barHeight);
-                    }
+                    opacity = 1; // Current - highlighted
                 } else {
-                    // Upcoming - medium dim
-                    opacity = 0.6;
+                    opacity = 0.6; // Upcoming - medium dim
                 }
             }
 
-            // Draw bar (if not current interval, which was drawn above)
-            if (index !== this.currentIntervalIndex || elapsedInInterval === 0) {
-                ctx.fillStyle = this.adjustOpacity(color, opacity);
-                ctx.fillRect(x, height - barHeight - 30, barWidth, barHeight);
+            // Draw interval shape based on type
+            if (powerType === 'ramp') {
+                // Draw ramp as trapezoid
+                const powerLow = Math.round(this.ftp * this.intensityScale * ((interval.percentageLow || 50) / 100));
+                const powerHigh = Math.round(this.ftp * this.intensityScale * ((interval.percentageHigh || 100) / 100));
+                const barHeightLow = (powerLow / maxPower) * (height - 30);
+                const barHeightHigh = (powerHigh / maxPower) * (height - 30);
+
+                // Handle progress for current ramp interval
+                if (index === this.currentIntervalIndex && elapsedInInterval > 0 && interval.duration > 0) {
+                    const progress = Math.min(elapsedInInterval / interval.duration, 1);
+                    const progressWidth = barWidth * progress;
+
+                    // Calculate intermediate height at progress point
+                    const progressHeight = barHeightLow + (barHeightHigh - barHeightLow) * progress;
+
+                    // Draw completed portion (brighter)
+                    if (progressWidth > 0) {
+                        ctx.fillStyle = this.adjustOpacity(color, 1);
+                        ctx.beginPath();
+                        ctx.moveTo(x, height - barHeightLow - 30);
+                        ctx.lineTo(x + progressWidth, height - progressHeight - 30);
+                        ctx.lineTo(x + progressWidth, height - 30);
+                        ctx.lineTo(x, height - 30);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+
+                    // Draw remaining portion (dimmed)
+                    if (progressWidth < barWidth) {
+                        ctx.fillStyle = this.adjustOpacity(color, 0.5);
+                        ctx.beginPath();
+                        ctx.moveTo(x + progressWidth, height - progressHeight - 30);
+                        ctx.lineTo(x + barWidth, height - barHeightHigh - 30);
+                        ctx.lineTo(x + barWidth, height - 30);
+                        ctx.lineTo(x + progressWidth, height - 30);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                } else {
+                    // Draw full ramp trapezoid
+                    ctx.fillStyle = this.adjustOpacity(color, opacity);
+                    ctx.beginPath();
+                    ctx.moveTo(x, height - barHeightLow - 30);
+                    ctx.lineTo(x + barWidth, height - barHeightHigh - 30);
+                    ctx.lineTo(x + barWidth, height - 30);
+                    ctx.lineTo(x, height - 30);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            } else {
+                // Draw regular interval as rectangle
+                const barHeight = (power / maxPower) * (height - 30);
+
+                if (index === this.currentIntervalIndex && elapsedInInterval > 0 && interval.duration > 0) {
+                    const progress = Math.min(elapsedInInterval / interval.duration, 1);
+                    const progressWidth = barWidth * progress;
+
+                    // Draw completed portion brighter
+                    ctx.fillStyle = this.adjustOpacity(color, 1);
+                    ctx.fillRect(x, height - barHeight - 30, progressWidth, barHeight);
+
+                    // Draw remaining portion dimmed
+                    ctx.fillStyle = this.adjustOpacity(color, 0.5);
+                    ctx.fillRect(x + progressWidth, height - barHeight - 30, barWidth - progressWidth, barHeight);
+                } else {
+                    ctx.fillStyle = this.adjustOpacity(color, opacity);
+                    ctx.fillRect(x, height - barHeight - 30, barWidth, barHeight);
+                }
             }
 
             // Draw separator line
