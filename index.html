@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zwift Hub Controller</title>
+    <title>Cycling Workout Controller</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/basecoat.cdn.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -21,7 +21,7 @@
                     <div class="pb-4 border-b border-border">
                         <div class="flex items-center gap-3 mb-4">
                             <i data-lucide="bike" class="w-7 h-7 text-accent"></i>
-                            <h2 class="text-xl font-semibold">Zwift Hub</h2>
+                            <h2 class="text-xl font-semibold">Cycling Workout</h2>
                         </div>
                         <div class="flex flex-col gap-2" x-data="{}">
                             <button
@@ -92,6 +92,17 @@
                             </a>
                         </li>
                     </ul>
+
+                    <!-- GitHub Link -->
+                    <a href="https://github.com/wolfv/zwift-hub-controller" target="_blank" rel="noopener noreferrer"
+                       class="flex items-center gap-3 p-3 mx-3 mb-3 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground group border border-border">
+                        <i data-lucide="github" class="size-5 group-hover:scale-110 transition-transform"></i>
+                        <div class="flex-1 text-sm">
+                            <div class="font-medium">Open Source</div>
+                            <div class="text-xs opacity-75">Contribute on GitHub</div>
+                        </div>
+                        <i data-lucide="external-link" class="size-4"></i>
+                    </a>
                 </div>
             </section>
         </nav>
@@ -609,18 +620,137 @@
                                 <i data-lucide="save"></i>
                                 <span>Save Workout</span>
                             </button>
-                            <button onclick="app.exportWorkout()" class="btn-outline w-full">
-                                <i data-lucide="download"></i>
-                                <span>Export JSON</span>
-                            </button>
-                            <button onclick="app.importWorkout()" class="btn-outline w-full">
-                                <i data-lucide="upload"></i>
-                                <span>Import JSON</span>
-                            </button>
+                            <div class="pt-2 border-t border-border">
+                                <div class="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-2">Import / Export</div>
+                                <div class="space-y-2">
+                                    <button onclick="app.exportWorkout()" class="btn-outline w-full text-sm">
+                                        <i data-lucide="download"></i>
+                                        <span>Export JSON</span>
+                                    </button>
+                                    <button onclick="app.importWorkout()" class="btn-outline w-full text-sm">
+                                        <i data-lucide="upload"></i>
+                                        <span>Import JSON</span>
+                                    </button>
+                                    <button onclick="app.exportZwo()" class="btn-outline w-full text-sm">
+                                        <i data-lucide="download"></i>
+                                        <span>Export ZWO</span>
+                                    </button>
+                                    <button onclick="app.importZwo()" class="btn-outline w-full text-sm">
+                                        <i data-lucide="upload"></i>
+                                        <span>Import ZWO</span>
+                                    </button>
+                                </div>
+                            </div>
                             <button onclick="app.loadWorkoutForRide()" class="btn-outline w-full">
                                 <i data-lucide="play"></i>
                                 <span>Load & Ride</span>
                             </button>
+                        </section>
+                    </div>
+
+                    <!-- AI Generation Help -->
+                    <div class="card" x-data="{ expanded: false }">
+                        <header class="border-b border-border cursor-pointer" @click="expanded = !expanded">
+                            <h2 class="flex items-center justify-between text-base font-semibold">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="sparkles" class="size-4 text-muted-foreground"></i>
+                                    <span>AI Workout Generator</span>
+                                </div>
+                                <i data-lucide="chevron-down" class="size-4 text-muted-foreground transition-transform" :class="{ 'rotate-180': expanded }"></i>
+                            </h2>
+                        </header>
+                        <section class="space-y-3" x-show="expanded" x-collapse>
+                            <div class="text-sm text-muted-foreground">
+                                <p class="mb-3">Use ChatGPT or Claude to generate custom workouts! Copy the prompt below:</p>
+
+                                <div class="relative">
+                                    <pre class="bg-background border border-border rounded-md p-3 text-xs overflow-x-auto max-h-[300px] overflow-y-auto" id="aiPromptText">I need a cycling workout in JSON format for the Zwift Hub Controller app.
+
+Please create a workout with the following requirements:
+- Workout goal: [e.g., "Sweet spot endurance", "VO2 max intervals", "FTP test"]
+- Duration: [e.g., "60 minutes", "90 minutes"]
+- Difficulty level: [e.g., "beginner", "intermediate", "advanced"]
+- Special requirements: [any specific needs]
+
+The JSON format should follow this structure:
+
+{
+  "name": "Workout Name",
+  "description": "Brief description of the workout",
+  "ftp": 200,
+  "intervals": [
+    {
+      "name": "Interval Name",
+      "type": "warmup|endurance|tempo|threshold|vo2max|cooldown",
+      "duration": 300,
+      "powerType": "relative|absolute|ramp",
+      "percentage": 60  // for relative power
+      // OR
+      "power": 150  // for absolute power in watts
+      // OR for ramps:
+      "percentageLow": 50,
+      "percentageHigh": 80
+    }
+  ],
+  "created": "2025-01-15T12:00:00.000Z",
+  "version": "1.0"
+}
+
+Power type rules:
+- relative (% of FTP): Use for most intervals. Percentage between 10-200.
+- absolute (fixed watts): Use for specific power targets or ramp tests.
+- ramp (gradual increase): Use percentageLow and percentageHigh for smooth power transitions.
+
+Interval types and typical power zones:
+- warmup: 40-60% FTP
+- endurance: 55-75% FTP
+- tempo: 76-87% FTP
+- threshold: 88-105% FTP
+- vo2max: 106-120% FTP
+- cooldown: 40-50% FTP
+
+Please ensure:
+1. Workout starts with a proper warmup (10-15 minutes)
+2. Include recovery periods between hard efforts
+3. End with an adequate cooldown (10 minutes)
+4. Total duration matches my request
+5. Progression is logical and safe
+
+Return only the valid JSON, no additional explanation.</pre>
+                                    <button onclick="navigator.clipboard.writeText(document.getElementById('aiPromptText').textContent)"
+                                            class="absolute top-2 right-2 px-2 py-1 bg-muted hover:bg-accent border border-border rounded text-xs font-medium transition-colors">
+                                        <i data-lucide="copy" class="size-3 inline"></i>
+                                        Copy
+                                    </button>
+                                </div>
+
+                                <div class="mt-3 p-3 bg-muted border border-border rounded-md text-xs">
+                                    <div class="font-semibold mb-1 flex items-center gap-1">
+                                        <i data-lucide="info" class="size-3"></i>
+                                        How to use:
+                                    </div>
+                                    <ol class="list-decimal list-inside space-y-1 ml-1">
+                                        <li>Copy the prompt above</li>
+                                        <li>Paste into ChatGPT or Claude</li>
+                                        <li>Fill in your workout requirements</li>
+                                        <li>Copy the generated JSON</li>
+                                        <li>Use "Import JSON" button to load it</li>
+                                    </ol>
+                                </div>
+
+                                <div class="flex flex-col gap-2 mt-3">
+                                    <a href="WORKOUT-GENERATION-PROMPT.md" target="_blank" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                        <i data-lucide="file-text" class="size-3"></i>
+                                        View full prompt guide
+                                        <i data-lucide="external-link" class="size-3"></i>
+                                    </a>
+                                    <a href="https://www.zwiftworkout.com/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                        <i data-lucide="edit-3" class="size-3"></i>
+                                        Create workout with Zwift Workout Editor
+                                        <i data-lucide="external-link" class="size-3"></i>
+                                    </a>
+                                </div>
+                            </div>
                         </section>
                     </div>
                 </div>
@@ -827,6 +957,7 @@
     <script src="hr-zones.js"></script>
     <script src="session-p2p.js"></script>
     <script src="racetrack.js"></script>
+    <script src="zwo-converter.js"></script>
     <script src="app.js"></script>
     <script>
         // Initialize Lucide icons

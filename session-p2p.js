@@ -232,6 +232,24 @@ class P2PSessionManager {
                     type: 'workout',
                     workout: this.sharedWorkout
                 });
+
+                // If workout is in progress, send start time for sync
+                const workoutInfo = localStorage.getItem('workout_start_info');
+                if (workoutInfo) {
+                    try {
+                        const info = JSON.parse(workoutInfo);
+                        // Only send if workout is still ongoing (within reasonable time)
+                        const elapsed = Date.now() - info.startTime;
+                        if (elapsed < 7200000) { // 2 hours max
+                            this.sendToPeer(peerId, {
+                                type: 'start-countdown',
+                                startTime: info.startTime
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse workout start info:', e);
+                    }
+                }
             }
         });
 

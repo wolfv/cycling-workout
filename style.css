@@ -428,6 +428,28 @@ details summary::-webkit-details-marker {
 .interval-vo2max { border-left: 4px solid #a855f7; }
 .interval-cooldown { border-left: 4px solid #6366f1; }
 
+/* Ramp interval styling - diagonal gradient to indicate power increase */
+.interval-ramp {
+  position: relative;
+  overflow: hidden;
+}
+
+.interval-ramp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    transparent 0%,
+    transparent 48%,
+    rgba(255, 255, 255, 0.05) 48%,
+    rgba(255, 255, 255, 0.05) 52%,
+    transparent 52%,
+    transparent 100%);
+  background-size: 20px 20px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .interval-warmup::before,
 .interval-endurance::before,
 .interval-tempo::before,

@@ -31,6 +31,10 @@ class WorkoutProgressVisualizer {
         this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
         this.width = rect.width;
         this.height = rect.height;
+        // Redraw after resize
+        if (this.intervals.length > 0) {
+            this.draw();
+        }
     }
 
     setWorkout(intervals, ftp, intensityScale = 1) {

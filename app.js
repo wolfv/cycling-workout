@@ -45,6 +45,15 @@ class App {
         // Initialize workout recorder
         this.workoutRecorder = new WorkoutRecorder();
 
+        // Prevent navigation away during workout
+        window.addEventListener('beforeunload', (e) => {
+            if (window.workoutDesigner && window.workoutDesigner.isRunning) {
+                e.preventDefault();
+                e.returnValue = ''; // Required for Chrome
+                return 'You have an active workout. Are you sure you want to leave?';
+            }
+        });
+
     // Initialize quick control UI
     this.initQuickControl();
 
@@ -284,6 +293,14 @@ class App {
         // Switch to ride tab
         this.switchTab('ride');
 
+        // Trigger resize on workout progress chart after card is shown
+        // This ensures the canvas has proper dimensions when drawn
+        setTimeout(() => {
+            if (window.workoutDesigner && window.workoutDesigner.progressVisualizer) {
+                window.workoutDesigner.progressVisualizer.resize();
+            }
+        }, 10);
+
         // Start recording workout
         const workoutName = 'Indoor Cycling Workout';
         this.workoutRecorder.start(workoutName);
@@ -433,6 +450,73 @@ class App {
             const file = e.target.files[0];
             if (file) {
                 window.workoutDesigner.importWorkout(file);
+            }
+        };
+        input.click();
+    }
+
+    exportZwo() {
+        const workout = window.workoutDesigner.exportWorkoutData();
+        if (!workout || !workout.intervals || workout.intervals.length === 0) {
+            this.log('No workout to export', 'error');
+            return;
+        }
+
+        try {
+            // Convert to ZWO XML format
+            const zwoXml = ZwoConverter.toZwo(workout);
+
+            // Create download
+            const blob = new Blob([zwoXml], { type: 'application/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${workout.name || 'workout'}.zwo`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            this.log('Workout exported as ZWO', 'success');
+        } catch (error) {
+            console.error('ZWO export error:', error);
+            this.log('Failed to export ZWO: ' + error.message, 'error');
+        }
+    }
+
+    importZwo() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.zwo';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const xmlString = event.target.result;
+                        const workout = ZwoConverter.fromZwo(xmlString);
+
+                        // Flatten intervals (in case IntervalsT was expanded)
+                        const flattenedIntervals = [];
+                        workout.intervals.forEach(interval => {
+                            if (Array.isArray(interval)) {
+                                flattenedIntervals.push(...interval);
+                            } else {
+                                flattenedIntervals.push(interval);
+                            }
+                        });
+                        workout.intervals = flattenedIntervals;
+
+                        // Import into designer
+                        window.workoutDesigner.importWorkoutData(workout);
+                        this.log(`Imported ZWO workout: ${workout.name}`, 'success');
+                    } catch (error) {
+                        console.error('ZWO import error:', error);
+                        this.log('Failed to import ZWO: ' + error.message, 'error');
+                    }
+                };
+                reader.readAsText(file);
             }
         };
         input.click();
@@ -1047,6 +1131,26 @@ class App {
         const delay = startTime - Date.now();
         const seconds = Math.ceil(delay / 1000);
 
+        // If startTime is in the past, join workout in progress
+        if (delay < -1000) { // More than 1 second in the past
+            const elapsedMs = Math.abs(delay);
+            this.log(`Joining workout in progress (started ${Math.floor(elapsedMs / 1000)}s ago)...`, 'info');
+
+            try {
+                // Start the workout with the original start time for proper sync
+                window.workoutDesigner.startWorkout(startTime);
+                this.log('Synced to ongoing workout!', 'success');
+
+                // Update host controls (if they exist)
+                const startBtn = document.getElementById('startSyncedBtnSidebar');
+                if (startBtn) startBtn.style.display = 'none';
+            } catch (error) {
+                console.error('Error joining workout:', error);
+                this.log('Failed to join workout: ' + error.message, 'error');
+            }
+            return;
+        }
+
         this.log(`Workout starting in ${seconds} seconds...`, 'info');
 
         // Show countdown
@@ -1066,10 +1170,10 @@ class App {
                     clearInterval(countdownInterval);
                     countdownEl.style.display = 'none';
 
-                    // Start workout
+                    // Start workout with exact start time
                     this.log('Starting workout now!', 'success');
                     try {
-                        window.workoutDesigner.startWorkout();
+                        window.workoutDesigner.startWorkout(startTime);
 
                         // Update host controls (if they exist)
                         const startBtn = document.getElementById('startSyncedBtnSidebar');
@@ -1083,7 +1187,7 @@ class App {
         } else {
             // If countdown elements don't exist, start immediately
             this.log('Starting workout immediately (no countdown display)', 'info');
-            window.workoutDesigner.startWorkout();
+            window.workoutDesigner.startWorkout(startTime);
         }
     }
 
@@ -1120,9 +1224,16 @@ class App {
         // Setup race track with workout
         this.raceTrack.setWorkout(window.workoutDesigner.intervals, window.workoutDesigner.ftp);
 
-        // Start synchronized countdown
-        const countdownSeconds = 5;
+        // Start synchronized countdown with 15 seconds for better sync
+        const countdownSeconds = 15;
         const startTime = Date.now() + (countdownSeconds * 1000);
+
+        // Store workout start info for rejoin capability
+        localStorage.setItem('workout_start_info', JSON.stringify({
+            startTime,
+            sessionId: this.sessionManager.sessionId,
+            workout: workout
+        }));
 
         // Broadcast to others
         this.sessionManager.startSynchronizedWorkout(countdownSeconds);

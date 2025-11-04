@@ -192,15 +192,23 @@ class WorkoutDesigner {
 
     createIntervalElement(interval, index, pixelsPerSecond) {
         const el = document.createElement('div');
-        el.className = `workout-interval interval-${interval.type}`;
+        const powerType = interval.powerType || 'relative';
+        const rampClass = powerType === 'ramp' ? ' interval-ramp' : '';
+        el.className = `workout-interval interval-${interval.type}${rampClass}`;
         el.style.width = `${interval.duration * pixelsPerSecond}px`;
         el.dataset.intervalId = interval.id;
 
-        // Calculate power based on powerType (relative or absolute)
-        const powerType = interval.powerType || 'relative';
+        // Calculate power based on powerType (relative, absolute, or ramp)
         let power, displayText;
-        
-        if (powerType === 'absolute') {
+
+        if (powerType === 'ramp') {
+            const percentageLow = interval.percentageLow || 50;
+            const percentageHigh = interval.percentageHigh || 100;
+            const powerLow = Math.round(this.ftp * this.intensityScale * (percentageLow / 100));
+            const powerHigh = Math.round(this.ftp * this.intensityScale * (percentageHigh / 100));
+            power = powerHigh; // Use high power for display
+            displayText = `${percentageLow}% → ${percentageHigh}% FTP`;
+        } else if (powerType === 'absolute') {
             const basePower = interval.power || 0;
             power = this.getIntervalPower(interval);
             displayText = `${basePower}W Absolute${this.intensityScale !== 1 ? ` → ${power}W` : ''}`;
@@ -337,7 +345,7 @@ class WorkoutDesigner {
         document.getElementById('totalWork').textContent = totalWork.toFixed(1);
     }
 
-    async startWorkout() {
+    async startWorkout(syncStartTime = null) {
         if (this.intervals.length === 0) {
             alert('Please add some intervals first!');
             return;
@@ -349,15 +357,49 @@ class WorkoutDesigner {
         }
 
         this.isRunning = true;
-        this.currentIntervalIndex = 0;
-        this.workoutStartTime = Date.now();
-        this.intervalStartTime = Date.now();
 
-        this.ftms.log('🎯 Starting workout!', 'success');
+        // Use provided sync time or current time
+        this.workoutStartTime = syncStartTime || Date.now();
+        const now = Date.now();
+        const elapsedTotal = now - this.workoutStartTime;
+
+        // Find which interval we should be in based on elapsed time
+        let currentIntervalIndex = 0;
+        let elapsedBeforeCurrentInterval = 0;
+
+        if (elapsedTotal > 0) {
+            // Fast-forward to correct interval for mid-workout join
+            let accumulatedTime = 0;
+            for (let i = 0; i < this.intervals.length; i++) {
+                const intervalDuration = this.intervals[i].duration * 1000;
+                if (accumulatedTime + intervalDuration > elapsedTotal) {
+                    currentIntervalIndex = i;
+                    elapsedBeforeCurrentInterval = accumulatedTime;
+                    break;
+                }
+                accumulatedTime += intervalDuration;
+            }
+
+            // If we've passed all intervals, workout is over
+            if (currentIntervalIndex === 0 && elapsedBeforeCurrentInterval === 0 && elapsedTotal > 0) {
+                const totalDuration = this.intervals.reduce((sum, i) => sum + i.duration * 1000, 0);
+                if (elapsedTotal >= totalDuration) {
+                    this.ftms.log('⚠️ Workout already completed', 'warning');
+                    return;
+                }
+            }
+
+            this.ftms.log(`⏩ Joining workout at interval ${currentIntervalIndex + 1}`, 'success');
+        } else {
+            this.ftms.log('🎯 Starting workout!', 'success');
+        }
+
+        this.currentIntervalIndex = currentIntervalIndex;
+        this.intervalStartTime = this.workoutStartTime + elapsedBeforeCurrentInterval;
 
         // Initialize progress visualizer
         this.progressVisualizer = new WorkoutProgressVisualizer('workoutProgressChart');
-    this.progressVisualizer.setWorkout(this.intervals, this.ftp, this.intensityScale);
+        this.progressVisualizer.setWorkout(this.intervals, this.ftp, this.intensityScale);
         this.progressVisualizer.start(this.workoutStartTime);
 
         // Start progress update loop (update every 100ms for smooth progress bar)
@@ -369,7 +411,7 @@ class WorkoutDesigner {
             this.onWorkoutStart();
         }
 
-        await this.executeInterval(0);
+        await this.executeInterval(currentIntervalIndex);
     }
 
     async executeInterval(index) {
@@ -743,6 +785,116 @@ class WorkoutDesigner {
         };
         
         reader.readAsText(file);
+    }
+
+    // Export current workout data without prompts (for ZWO export)
+    exportWorkoutData() {
+        if (this.intervals.length === 0) {
+            return null;
+        }
+
+        return {
+            name: 'Custom Workout',
+            description: '',
+            ftp: this.ftp,
+            intervals: this.intervals.map(interval => {
+                const cleanInterval = {
+                    name: interval.name,
+                    type: interval.type,
+                    duration: interval.duration,
+                    powerType: interval.powerType || 'relative'
+                };
+
+                if (cleanInterval.powerType === 'ramp') {
+                    cleanInterval.percentageLow = interval.percentageLow;
+                    cleanInterval.percentageHigh = interval.percentageHigh;
+                } else if (cleanInterval.powerType === 'absolute') {
+                    cleanInterval.power = interval.power;
+                } else {
+                    cleanInterval.percentage = interval.percentage;
+                }
+
+                return cleanInterval;
+            }),
+            created: new Date().toISOString(),
+            version: '1.0'
+        };
+    }
+
+    // Import workout data directly (for ZWO import)
+    importWorkoutData(workout) {
+        // Validate workout structure
+        if (!workout || typeof workout !== 'object') {
+            console.error('Invalid workout object:', workout);
+            throw new Error('Invalid workout format: expected object');
+        }
+        if (!workout.intervals || !Array.isArray(workout.intervals)) {
+            console.error('Invalid intervals:', workout.intervals);
+            throw new Error('Invalid workout format: missing or invalid intervals array');
+        }
+
+        // Validate and normalize each interval
+        const validIntervals = workout.intervals.map((interval, index) => {
+            if (!interval.duration || typeof interval.duration !== 'number') {
+                throw new Error(`Interval ${index + 1}: missing or invalid duration`);
+            }
+
+            const powerType = interval.powerType || (interval.power !== undefined ? 'absolute' : 'relative');
+
+            if (powerType === 'ramp') {
+                if (typeof interval.percentageLow !== 'number' || typeof interval.percentageHigh !== 'number') {
+                    throw new Error(`Interval ${index + 1}: ramp intervals require percentageLow and percentageHigh values`);
+                }
+            } else if (powerType === 'absolute') {
+                if (!interval.power || typeof interval.power !== 'number') {
+                    throw new Error(`Interval ${index + 1}: missing or invalid power value`);
+                }
+            } else {
+                if (!interval.percentage || typeof interval.percentage !== 'number') {
+                    throw new Error(`Interval ${index + 1}: missing or invalid percentage value`);
+                }
+            }
+
+            const normalized = {
+                id: Date.now() + Math.random(),
+                name: interval.name || `Interval ${index + 1}`,
+                type: interval.type || 'custom',
+                duration: interval.duration,
+                powerType: powerType
+            };
+
+            if (powerType === 'ramp') {
+                normalized.percentageLow = interval.percentageLow;
+                normalized.percentageHigh = interval.percentageHigh;
+            } else if (powerType === 'absolute') {
+                normalized.power = interval.power;
+            } else {
+                normalized.percentage = interval.percentage;
+            }
+
+            return normalized;
+        });
+
+        this.intervals = validIntervals;
+
+        if (workout.ftp && typeof workout.ftp === 'number') {
+            this.ftp = workout.ftp;
+            document.getElementById('ftpInput').value = this.ftp;
+        }
+
+        this.render();
+        this.updateWorkoutInfo();
+
+        // Auto-save if workout has a name
+        if (workout.name && workout.name !== 'Custom Workout') {
+            this.saveWorkout(workout.name);
+
+            if (window.app) {
+                if (typeof window.app.refreshWorkoutLibrary === 'function') {
+                    window.app.refreshWorkoutLibrary();
+                }
+            }
+        }
     }
 
     showWorkoutManager() {
