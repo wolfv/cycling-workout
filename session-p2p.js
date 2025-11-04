@@ -356,6 +356,9 @@ class P2PSessionManager {
             self.progress = progress;
         }
 
+        // Trigger UI update for all participants including self
+        this.updateParticipants();
+
         // Broadcast to all peers via P2P
         this.broadcast({
             type: 'metrics',

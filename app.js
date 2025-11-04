@@ -1067,13 +1067,23 @@ class App {
                     countdownEl.style.display = 'none';
 
                     // Start workout
-                    window.workoutDesigner.startWorkout();
+                    this.log('Starting workout now!', 'success');
+                    try {
+                        window.workoutDesigner.startWorkout();
 
-                    // Update host controls
-                    document.getElementById('startSyncedBtn').style.display = 'none';
-                    document.getElementById('endSyncedBtn').classList.remove('hidden');
+                        // Update host controls (if they exist)
+                        const startBtn = document.getElementById('startSyncedBtnSidebar');
+                        if (startBtn) startBtn.style.display = 'none';
+                    } catch (error) {
+                        console.error('Error starting workout:', error);
+                        this.log('Failed to start workout: ' + error.message, 'error');
+                    }
                 }
             }, 1000);
+        } else {
+            // If countdown elements don't exist, start immediately
+            this.log('Starting workout immediately (no countdown display)', 'info');
+            window.workoutDesigner.startWorkout();
         }
     }
 
@@ -1149,9 +1159,9 @@ class App {
             window.workoutDesigner.stopWorkout();
         }
 
-        // Reset host controls
-        document.getElementById('startSyncedBtn').style.display = 'block';
-        document.getElementById('endSyncedBtn').classList.add('hidden');
+        // Reset host controls (if they exist)
+        const startBtn = document.getElementById('startSyncedBtnSidebar');
+        if (startBtn) startBtn.style.display = 'block';
     }
 
     openMeetLink() {
