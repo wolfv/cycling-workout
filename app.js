@@ -891,7 +891,6 @@ class App {
             document.getElementById('sessionNotConnected').style.display = 'none';
             document.getElementById('sessionConnected').style.display = 'block';
             document.getElementById('sessionCodeDisplay').textContent = result.sessionId;
-            document.getElementById('sessionHostControls').style.display = 'block';
 
             // Set FTP input to current workout designer FTP
             document.getElementById('sessionFtpInput').value = window.workoutDesigner.ftp;
@@ -1174,12 +1173,7 @@ class App {
         // Update race track
     this.raceTrack.setParticipants(normalized);
         this.raceTrack.draw();
-        
-        // Update workout participants list if workout is active
-        if (window.workoutDesigner && window.workoutDesigner.isRunning) {
-            this.updateWorkoutParticipants();
-        }
-        
+
         // Update workout control buttons
         this.updateWorkoutControlButtons();
     }
