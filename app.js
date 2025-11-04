@@ -150,10 +150,6 @@ class App {
             document.getElementById('sessionConnected').style.display = 'block';
             document.getElementById('sessionCodeDisplay').textContent = result.sessionId;
 
-            if (this.sessionManager.isHost) {
-                document.getElementById('sessionHostControls').style.display = 'block';
-            }
-
             // Set FTP input
             document.getElementById('sessionFtpInput').value = window.workoutDesigner.ftp;
 
@@ -288,11 +284,6 @@ class App {
         // Switch to ride tab
         this.switchTab('ride');
 
-        // Show participants section if in a session
-        if (this.sessionManager && this.sessionManager.isConnected()) {
-            this.updateWorkoutParticipants();
-        }
-
         // Start recording workout
         const workoutName = 'Indoor Cycling Workout';
         this.workoutRecorder.start(workoutName);
@@ -412,56 +403,6 @@ class App {
         }
     }
 
-    updateWorkoutParticipants() {
-        const section = document.getElementById('workoutParticipantsSection');
-        const list = document.getElementById('workoutParticipantsList');
-        
-        if (!section || !list) return;
-        
-        if (this.sessionManager && this.sessionManager.isConnected()) {
-            const participants = this.sessionManager.getParticipants();
-            
-            if (participants.length > 0) {
-                section.style.display = 'block';
-                
-                list.innerHTML = participants.map(p => {
-                    const hrColor = p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
-                    const isMe = p.id === this.sessionManager.myId;
-                    
-                    return `
-                        <div class="p-3 bg-muted/50 border border-border rounded-md ${isMe ? 'border-l-4 border-l-primary' : ''}">
-                            <div class="flex justify-between items-center mb-2">
-                                <div class="font-semibold text-sm">
-                                    ${p.name}
-                                    ${p.isHost ? '<span class="badge badge-warning ml-1 text-xs">HOST</span>' : ''}
-                                    ${isMe ? '<span class="badge badge-primary ml-1 text-xs">YOU</span>' : ''}
-                                </div>
-                                <span class="text-xs text-muted-foreground">${p.ftp}W FTP</span>
-                            </div>
-                            <div class="flex gap-3 text-xs text-muted-foreground">
-                                <span class="flex items-center gap-1">
-                                    <i data-lucide="zap" class="w-3 h-3"></i> ${p.power}W
-                                </span>
-                                <span class="flex items-center gap-1">
-                                    <i data-lucide="gauge" class="w-3 h-3"></i> ${p.cadence}
-                                </span>
-                                <span class="flex items-center gap-1">
-                                    <i data-lucide="heart" class="w-3 h-3"></i>
-                                    <span style="color: ${hrColor}">${p.heartRate || '--'}</span>
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                
-                setTimeout(() => lucide.createIcons(), 0);
-            } else {
-                section.style.display = 'none';
-            }
-        } else {
-            section.style.display = 'none';
-        }
-    }
 
     updateFTP() {
         const ftp = parseInt(document.getElementById('ftpInput').value);
@@ -950,8 +891,6 @@ class App {
             // Update old session tab UI
             document.getElementById('sessionNotConnected').style.display = 'block';
             document.getElementById('sessionConnected').style.display = 'none';
-            document.getElementById('sessionHostControls').style.display = 'none';
-            document.getElementById('participantsList').innerHTML = '';
 
             // Clear inputs
             document.getElementById('quickJoinSessionCode').value = '';
@@ -1029,9 +968,6 @@ class App {
         document.getElementById('sessionNotConnected').style.display = 'none';
         document.getElementById('sessionConnected').style.display = 'block';
         document.getElementById('sessionCodeDisplay').textContent = sessionId;
-        if (isHost) {
-            document.getElementById('sessionHostControls').style.display = 'block';
-        }
 
         // Set FTP
         const ftp = window.workoutDesigner.ftp;
@@ -1069,109 +1005,16 @@ class App {
             isSelf: myId ? p.id === myId : Boolean(p.isSelf)
         }));
 
-        // Update Alpine store
+        // Update Alpine store - this will reactively update all UI elements
         if (window.Alpine) {
             Alpine.store('app').updateParticipants(normalized);
         }
 
-        const hasHRZones = typeof window !== 'undefined' && window.HRZones;
-
-        // Update participants list in Session tab
-        const listEl = document.getElementById('participantsList');
-        if (listEl) {
-            if (normalized.length === 0) {
-                listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>';
-            } else {
-                listEl.innerHTML = normalized.map(p => {
-                    const hrColor = hasHRZones && p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
-                    return `
-                    <div class="participant-card ${p.isHost ? 'host' : ''}">
-                        <div class="participant-info">
-                            <div class="participant-name">
-                                ${p.name}
-                                ${p.isHost ? '<span class="host-badge">HOST</span>' : ''}
-                                ${p.isSelf ? '<span class="host-badge" style="background:#3b82f6; color:#fff;">YOU</span>' : ''}
-                                <span class="ftp-badge">${p.ftp}W FTP</span>
-                            </div>
-                            <div class="participant-metrics">
-                                <span><i data-lucide="zap"></i> ${p.power}W</span>
-                                <span><i data-lucide="gauge"></i> ${p.cadence} rpm</span>
-                                <span><i data-lucide="heart"></i> <span style="color: ${hrColor}">${p.heartRate || '--'}</span></span>
-                            </div>
-                        </div>
-                        <div class="participant-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${p.progress * 100}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                `;}).join('');
-            }
-        }
-
-        // Update compact participants list in Active Workout card
-        const workoutListEl = document.getElementById('workoutParticipantsList');
-        const workoutSectionEl = document.getElementById('workoutParticipantsSection');
-
-        if (workoutListEl && workoutSectionEl) {
-            if (normalized.length > 0) {
-                workoutSectionEl.style.display = 'block';
-                workoutListEl.innerHTML = normalized.map(p => {
-                    const hrColor = hasHRZones && p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
-                    return `
-                    <div class="workout-participant-compact ${p.isHost ? 'host' : ''}">
-                        <div class="workout-participant-name">
-                            ${p.name}
-                            ${p.isHost ? '<span class="host-badge-mini">HOST</span>' : ''}
-                            ${p.isSelf ? '<span class="host-badge-mini" style="background:#3b82f6;color:#fff;">YOU</span>' : ''}
-                        </div>
-                        <div class="workout-participant-stats">
-                            <span class="stat-compact"><i data-lucide="zap"></i>${p.power}W</span>
-                            <span class="stat-compact"><i data-lucide="gauge"></i>${p.cadence}rpm</span>
-                            <span class="stat-compact"><i data-lucide="heart"></i><span style="color: ${hrColor}">${p.heartRate || '--'}</span></span>
-                            <span class="stat-compact ftp-mini">${p.ftp}W FTP</span>
-                        </div>
-                    </div>
-                `;}).join('');
-            } else {
-                workoutSectionEl.style.display = 'none';
-            }
-        }
-
-        // Update sidebar riders list (count is handled by Alpine)
-        const sidebarListEl = document.getElementById('ridersListSidebar');
-
-        if (sidebarListEl) {
-            if (normalized.length === 0) {
-                sidebarListEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No riders</div>';
-            } else {
-                sidebarListEl.innerHTML = normalized.map(p => {
-                    const hrColor = hasHRZones && p.heartRate > 0 ? HRZones.getHRColor(p.heartRate) : '#666';
-                    return `
-                    <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                            <div style="font-weight: 500;">
-                                ${p.name}
-                                ${p.isHost ? '<span class="badge-secondary" style="font-size: 0.7rem; margin-left: 0.25rem;">HOST</span>' : ''}
-                                ${p.isSelf ? '<span class="badge-secondary" style="font-size: 0.7rem; margin-left: 0.25rem; background:#3b82f6; color:#fff;">YOU</span>' : ''}
-                            </div>
-                            <span style="font-size: 0.75rem; color: var(--muted-foreground);">${p.ftp}W</span>
-                        </div>
-                        <div style="display: flex; gap: 0.75rem; font-size: 0.875rem; color: var(--muted-foreground);">
-                            <span><i data-lucide="zap" style="width: 14px; height: 14px;"></i> ${p.power}W</span>
-                            <span><i data-lucide="gauge" style="width: 14px; height: 14px;"></i> ${p.cadence}</span>
-                            <span><i data-lucide="heart" style="width: 14px; height: 14px;"></i> <span style="color: ${hrColor}">${p.heartRate || '--'}</span></span>
-                        </div>
-                    </div>
-                    `;
-                }).join('');
-            }
-        }
-
+        // Update icons after Alpine renders
         setTimeout(() => lucide.createIcons(), 0);
 
         // Update race track
-    this.raceTrack.setParticipants(normalized);
+        this.raceTrack.setParticipants(normalized);
         this.raceTrack.draw();
 
         // Update workout control buttons

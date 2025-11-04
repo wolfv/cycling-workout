@@ -288,13 +288,27 @@
                     <canvas id="workoutProgressChart" width="800" height="120" class="w-full h-[120px]"></canvas>
 
                     <!-- Session Participants (if in session) - Always show if in session -->
-                    <div id="workoutParticipantsSection" class="border-t border-border pt-4" style="display: none;">
+                    <div class="border-t border-border pt-4" x-show="$store.app.session.active && $store.app.session.participants.length" style="display: none;">
                         <div class="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                             <i data-lucide="users" class="size-4"></i>
                             <span>Riding Together</span>
                         </div>
-                        <div id="workoutParticipantsList" class="space-y-2 max-h-[200px] overflow-y-auto">
-                            <!-- Participants will be rendered here -->
+                        <div class="space-y-2 max-h-[200px] overflow-y-auto">
+                            <template x-for="participant in $store.app.session.participants" :key="participant.id">
+                                <div class="workout-participant-compact" :class="{ 'host': participant.isHost }">
+                                    <div class="workout-participant-name">
+                                        <span x-text="participant.name"></span>
+                                        <span class="host-badge-mini" x-show="participant.isHost" style="display: none;">HOST</span>
+                                        <span class="host-badge-mini" x-show="participant.isSelf" style="background:#3b82f6;color:#fff; display: none;">YOU</span>
+                                    </div>
+                                    <div class="workout-participant-stats">
+                                        <span class="stat-compact"><i data-lucide="zap"></i><span x-text="participant.power"></span>W</span>
+                                        <span class="stat-compact"><i data-lucide="gauge"></i><span x-text="participant.cadence"></span>rpm</span>
+                                        <span class="stat-compact"><i data-lucide="heart"></i><span :style="{ color: participant.hrColor }" x-text="participant.heartRate || '--'"></span></span>
+                                        <span class="stat-compact ftp-mini" x-text="participant.ftp + 'W FTP'"></span>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
 
@@ -404,8 +418,27 @@
                     </div>
                 </header>
                 <section class="px-0">
-                    <div id="ridersListSidebar" class="riders-list">
-                        <!-- Riders will be rendered here -->
+                    <div class="riders-list">
+                        <template x-if="!$store.app.session.participants.length">
+                            <div style="color: var(--text-muted); text-align: center; padding: 1rem;">No riders</div>
+                        </template>
+                        <template x-for="participant in $store.app.session.participants" :key="participant.id">
+                            <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <div style="font-weight: 500;">
+                                        <span x-text="participant.name"></span>
+                                        <span class="badge-secondary" x-show="participant.isHost" style="font-size: 0.7rem; margin-left: 0.25rem; display: none;">HOST</span>
+                                        <span class="badge-secondary" x-show="participant.isSelf" style="font-size: 0.7rem; margin-left: 0.25rem; background:#3b82f6; color:#fff; display: none;">YOU</span>
+                                    </div>
+                                    <span style="font-size: 0.75rem; color: var(--muted-foreground);" x-text="participant.ftp + 'W'"></span>
+                                </div>
+                                <div style="display: flex; gap: 0.75rem; font-size: 0.875rem; color: var(--muted-foreground);">
+                                    <span><i data-lucide="zap" style="width: 14px; height: 14px;"></i> <span x-text="participant.power"></span>W</span>
+                                    <span><i data-lucide="gauge" style="width: 14px; height: 14px;"></i> <span x-text="participant.cadence"></span></span>
+                                    <span><i data-lucide="heart" style="width: 14px; height: 14px;"></i> <span :style="{ color: participant.hrColor }" x-text="participant.heartRate || '--'"></span></span>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </section>
                 <footer>
@@ -749,8 +782,32 @@
                         </h2>
                     </header>
                     <section class="p-6">
-                        <div id="participantsList" class="space-y-3">
-                            <!-- Participants will be rendered here -->
+                        <div class="space-y-3">
+                            <template x-if="!$store.app.session.participants.length">
+                                <div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>
+                            </template>
+                            <template x-for="participant in $store.app.session.participants" :key="participant.id">
+                                <div class="participant-card" :class="{ 'host': participant.isHost }">
+                                    <div class="participant-info">
+                                        <div class="participant-name">
+                                            <span x-text="participant.name"></span>
+                                            <span class="host-badge" x-show="participant.isHost" style="display: none;">HOST</span>
+                                            <span class="host-badge" x-show="participant.isSelf" style="background:#3b82f6; color:#fff; display: none;">YOU</span>
+                                            <span class="ftp-badge" x-text="participant.ftp + 'W FTP'"></span>
+                                        </div>
+                                        <div class="participant-metrics">
+                                            <span><i data-lucide="zap"></i> <span x-text="participant.power"></span>W</span>
+                                            <span><i data-lucide="gauge"></i> <span x-text="participant.cadence"></span> rpm</span>
+                                            <span><i data-lucide="heart"></i> <span :style="{ color: participant.hrColor }" x-text="participant.heartRate || '--'"></span></span>
+                                        </div>
+                                    </div>
+                                    <div class="participant-progress">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" :style="{ width: (participant.progress * 100) + '%' }"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </section>
                 </div>
