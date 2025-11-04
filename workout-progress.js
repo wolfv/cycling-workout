@@ -101,12 +101,17 @@ class WorkoutProgressVisualizer {
             }
 
             // Draw interval shape based on type
+            let barHeight; // Declare for use in separator line and label
+
             if (powerType === 'ramp') {
                 // Draw ramp as trapezoid
                 const powerLow = Math.round(this.ftp * this.intensityScale * ((interval.percentageLow || 50) / 100));
                 const powerHigh = Math.round(this.ftp * this.intensityScale * ((interval.percentageHigh || 100) / 100));
                 const barHeightLow = (powerLow / maxPower) * (height - 30);
                 const barHeightHigh = (powerHigh / maxPower) * (height - 30);
+
+                // Use the max height for separator line and label
+                barHeight = Math.max(barHeightLow, barHeightHigh);
 
                 // Handle progress for current ramp interval
                 if (index === this.currentIntervalIndex && elapsedInInterval > 0 && interval.duration > 0) {
@@ -152,7 +157,7 @@ class WorkoutProgressVisualizer {
                 }
             } else {
                 // Draw regular interval as rectangle
-                const barHeight = (power / maxPower) * (height - 30);
+                barHeight = (power / maxPower) * (height - 30);
 
                 if (index === this.currentIntervalIndex && elapsedInInterval > 0 && interval.duration > 0) {
                     const progress = Math.min(elapsedInInterval / interval.duration, 1);
