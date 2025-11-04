@@ -1,0 +1,149 @@
+{
+  "name": "45-Minute FTP Ramp Test",
+  "description": "Progressive ramp test to determine your FTP. Increase power every minute until failure.",
+  "ftp": 200,
+  "intervals": [
+    {
+      "name": "Warmup",
+      "type": "warmup",
+      "duration": 30,
+      "powerType": "relative",
+      "percentage": 50
+    },
+    {
+      "name": "Warmup",
+      "type": "warmup",
+      "duration": 60,
+      "powerType": "relative",
+      "percentage": 55
+    },
+    {
+      "name": "Warmup",
+      "type": "warmup",
+      "duration": 120,
+      "powerType": "relative",
+      "percentage": 60
+    },
+    {
+      "name": "Build 1",
+      "type": "tempo",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 65
+    },
+    {
+      "name": "Build 2",
+      "type": "tempo",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 75
+    },
+    {
+      "name": "Ramp Step 1",
+      "type": "threshold",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 100
+    },
+    {
+      "name": "Ramp Step 2",
+      "type": "threshold",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 120
+    },
+    {
+      "name": "Ramp Step 3",
+      "type": "threshold",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 140
+    },
+    {
+      "name": "Ramp Step 4",
+      "type": "threshold",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 160
+    },
+    {
+      "name": "Ramp Step 5",
+      "type": "threshold",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 180
+    },
+    {
+      "name": "Ramp Step 6",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 200
+    },
+    {
+      "name": "Ramp Step 7",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 220
+    },
+    {
+      "name": "Ramp Step 8",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 240
+    },
+    {
+      "name": "Ramp Step 9",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 260
+    },
+    {
+      "name": "Ramp Step 10",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 280
+    },
+    {
+      "name": "Ramp Step 11",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 300
+    },
+    {
+      "name": "Ramp Step 12",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 320
+    },
+    {
+      "name": "Ramp Step 13",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 340
+    },
+    {
+      "name": "Ramp Step 14",
+      "type": "vo2max",
+      "duration": 180,
+      "powerType": "absolute",
+      "power": 360
+    },
+    {
+      "name": "Cooldown",
+      "type": "cooldown",
+      "duration": 600,
+      "powerType": "relative",
+      "percentage": 40
+    }
+  ],
+  "created": "2025-10-28T12:00:00.000Z",
+  "version": "1.0"
+}

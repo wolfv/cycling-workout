@@ -1,0 +1,62 @@
+{
+  "name": "Ramp Test Workout",
+  "description": "Progressive ramp intervals to build power gradually",
+  "ftp": 200,
+  "intervals": [
+    {
+      "name": "Warmup",
+      "type": "warmup",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 50
+    },
+    {
+      "name": "Progressive Ramp 1",
+      "type": "tempo",
+      "duration": 600,
+      "powerType": "ramp",
+      "percentageLow": 50,
+      "percentageHigh": 80
+    },
+    {
+      "name": "Recovery",
+      "type": "endurance",
+      "duration": 180,
+      "powerType": "relative",
+      "percentage": 55
+    },
+    {
+      "name": "Threshold Ramp",
+      "type": "threshold",
+      "duration": 480,
+      "powerType": "ramp",
+      "percentageLow": 80,
+      "percentageHigh": 105
+    },
+    {
+      "name": "Recovery",
+      "type": "endurance",
+      "duration": 240,
+      "powerType": "relative",
+      "percentage": 60
+    },
+    {
+      "name": "VO2 Max Ramp",
+      "type": "vo2max",
+      "duration": 360,
+      "powerType": "ramp",
+      "percentageLow": 90,
+      "percentageHigh": 120
+    },
+    {
+      "name": "Cooldown Ramp",
+      "type": "cooldown",
+      "duration": 420,
+      "powerType": "ramp",
+      "percentageLow": 70,
+      "percentageHigh": 40
+    }
+  ],
+  "created": "2025-01-15T12:00:00.000Z",
+  "version": "1.0"
+}

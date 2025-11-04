@@ -1,0 +1,79 @@
+{
+  "name": "Sweet Spot Intervals",
+  "description": "4x10 minute intervals at 88-94% FTP with 5 minute recoveries",
+  "ftp": 200,
+  "intervals": [
+    {
+      "name": "Warmup",
+      "type": "warmup",
+      "duration": 900,
+      "powerType": "relative",
+      "percentage": 55
+    },
+    {
+      "name": "Build",
+      "type": "tempo",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 75
+    },
+    {
+      "name": "Sweet Spot 1",
+      "type": "threshold",
+      "duration": 600,
+      "powerType": "relative",
+      "percentage": 90
+    },
+    {
+      "name": "Recovery 1",
+      "type": "endurance",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 55
+    },
+    {
+      "name": "Sweet Spot 2",
+      "type": "threshold",
+      "duration": 600,
+      "powerType": "relative",
+      "percentage": 90
+    },
+    {
+      "name": "Recovery 2",
+      "type": "endurance",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 55
+    },
+    {
+      "name": "Sweet Spot 3",
+      "type": "threshold",
+      "duration": 600,
+      "powerType": "relative",
+      "percentage": 90
+    },
+    {
+      "name": "Recovery 3",
+      "type": "endurance",
+      "duration": 300,
+      "powerType": "relative",
+      "percentage": 55
+    },
+    {
+      "name": "Sweet Spot 4",
+      "type": "threshold",
+      "duration": 600,
+      "powerType": "relative",
+      "percentage": 90
+    },
+    {
+      "name": "Cooldown",
+      "type": "cooldown",
+      "duration": 600,
+      "powerType": "relative",
+      "percentage": 45
+    }
+  ],
+  "created": "2025-10-28T12:00:00.000Z",
+  "version": "1.0"
+}
