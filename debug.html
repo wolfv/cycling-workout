@@ -527,7 +527,8 @@
                 device = await navigator.bluetooth.requestDevice({
                     filters: [
                         { services: [FITNESS_MACHINE_SERVICE] },
-                        { services: [CYCLING_POWER_SERVICE] }
+                        { services: [CYCLING_POWER_SERVICE] },
+                        { services: [HEART_RATE_SERVICE] }
                     ],
                     optionalServices: [
                         FITNESS_MACHINE_SERVICE,
