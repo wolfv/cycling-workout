@@ -260,6 +260,7 @@ class App {
         this.ftms.disconnect();
         if (window.Alpine) {
             Alpine.store('app').setConnected(false);
+            Alpine.store('app').setHRMConnected(false);
         }
         this.updateQuickControlAvailability();
 
@@ -269,6 +270,30 @@ class App {
         }
         if (window.workoutDesigner.isRunning) {
             window.workoutDesigner.stopWorkout();
+        }
+    }
+
+    async connectHRM() {
+        if (window.Alpine) {
+            Alpine.store('app').setHRMConnecting(true);
+        }
+
+        const connected = await this.ftms.connectHRM();
+        if (connected) {
+            if (window.Alpine) {
+                Alpine.store('app').setHRMConnected(true, this.ftms.hrmDevice?.name);
+            }
+        } else {
+            if (window.Alpine) {
+                Alpine.store('app').setHRMConnecting(false);
+            }
+        }
+    }
+
+    disconnectHRM() {
+        this.ftms.disconnectHRM();
+        if (window.Alpine) {
+            Alpine.store('app').setHRMConnected(false);
         }
     }
 

@@ -25,6 +25,11 @@ document.addEventListener('alpine:init', () => {
         connecting: false,
         deviceName: null,
 
+        // HRM connection state
+        hrmConnected: false,
+        hrmConnecting: false,
+        hrmDeviceName: null,
+
         // Metrics (flattened for better reactivity)
         power: 0,
         cadence: 0,
@@ -70,6 +75,16 @@ document.addEventListener('alpine:init', () => {
 
         setConnecting(connecting) {
             this.connecting = connecting;
+        },
+
+        setHRMConnected(connected, deviceName = null) {
+            this.hrmConnected = connected;
+            this.hrmConnecting = false;
+            this.hrmDeviceName = deviceName;
+        },
+
+        setHRMConnecting(connecting) {
+            this.hrmConnecting = connecting;
         },
 
         updateMetrics(metrics) {

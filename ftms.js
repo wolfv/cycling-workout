@@ -8,6 +8,10 @@ class FTMSController {
         this.onMetricsUpdate = null;
         this.onLog = null;
         this.lastDeviceId = null;
+
+        // Secondary heart rate monitor
+        this.hrmDevice = null;
+        this.hrmServer = null;
     }
 
     // Save last connected device to localStorage
@@ -168,6 +172,66 @@ class FTMSController {
             }
             return false;
         }
+    }
+
+    // Connect to a separate heart rate monitor
+    async connectHRM() {
+        try {
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const isHttps = window.location.protocol === 'https:';
+            if (!isLocalhost && !isHttps) {
+                alert('Requires HTTPS or localhost');
+                return false;
+            }
+
+            this.log('Scanning for heart rate monitors...', 'info');
+
+            this.hrmDevice = await navigator.bluetooth.requestDevice({
+                filters: [
+                    { services: [this.HEART_RATE_SERVICE] }
+                ],
+                optionalServices: [
+                    this.HEART_RATE_SERVICE,
+                    this.DEVICE_INFO_SERVICE
+                ]
+            });
+
+            this.log(`Found HR monitor: ${this.hrmDevice.name}`, 'success');
+            this.hrmServer = await this.hrmDevice.gatt.connect();
+            this.log('Connected to HR monitor', 'success');
+
+            // Subscribe to heart rate notifications
+            const hrService = await this.hrmServer.getPrimaryService(this.HEART_RATE_SERVICE);
+            const hrChar = await hrService.getCharacteristic(0x2a37);
+            hrChar.addEventListener('characteristicvaluechanged', (e) => {
+                const flags = e.target.value.getUint8(0);
+                this.metrics.hr = flags & 0x01 ? e.target.value.getUint16(1, true) : e.target.value.getUint8(1);
+                this.metrics.timestamp = Date.now();
+                if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);
+            });
+            await hrChar.startNotifications();
+            this.log('Subscribed to Heart Rate from HRM device', 'success');
+
+            return true;
+        } catch (error) {
+            if (error.name !== 'NotAllowedError') {
+                this.log(`HRM Error: ${error.message}`, 'error');
+            }
+            return false;
+        }
+    }
+
+    disconnectHRM() {
+        if (this.hrmDevice && this.hrmDevice.gatt) {
+            this.hrmDevice.gatt.disconnect();
+            this.hrmDevice = null;
+            this.hrmServer = null;
+            this.log('HR monitor disconnected', 'info');
+        }
+    }
+
+    isHRMConnected() {
+        return this.hrmDevice && this.hrmDevice.gatt && this.hrmDevice.gatt.connected;
     }
 
     async subscribeToMetrics() {
@@ -494,6 +558,8 @@ class FTMSController {
             this.controlPointChar = null;
             this.log('Disconnected', 'info');
         }
+        // Also disconnect HRM if connected
+        this.disconnectHRM();
     }
 
     isConnected() {
