@@ -53,3 +53,6 @@ class HRZones {
         return `${hr} <span style="color: ${this.getZoneColor(zone)}">Z${zone}</span>`;
     }
 }
+
+// Expose globally for Alpine store
+window.HRZones = HRZones;

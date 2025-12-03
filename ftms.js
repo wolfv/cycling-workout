@@ -12,6 +12,9 @@ class FTMSController {
         // Secondary heart rate monitor
         this.hrmDevice = null;
         this.hrmServer = null;
+
+        // Track if trainer provides HR data
+        this.hasTrainerHR = false;
     }
 
     // Save last connected device to localStorage
@@ -407,8 +410,10 @@ class FTMSController {
                 if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);
             });
             await hrChar.startNotifications();
+            this.hasTrainerHR = true;
             this.log('Subscribed to Heart Rate', 'success');
         } catch (e) {
+            this.hasTrainerHR = false;
             this.log(`Heart Rate: ${e.message}`, 'warning');
         }
 
@@ -556,6 +561,7 @@ class FTMSController {
             this.device = null;
             this.server = null;
             this.controlPointChar = null;
+            this.hasTrainerHR = false;
             this.log('Disconnected', 'info');
         }
         // Also disconnect HRM if connected

@@ -48,10 +48,10 @@
                                 <i data-lucide="bluetooth-off"></i>
                                 <span>Disconnect</span>
                             </button>
-                            <!-- HR Monitor Connect Button -->
+                            <!-- HR Monitor Connect Button (only shown if trainer doesn't provide HR) -->
                             <button
                                 onclick="app.connectHRM()"
-                                x-show="$store.app.connected && !$store.app.hrmConnected && !$store.app.hrmConnecting"
+                                x-show="$store.app.connected && !$store.app.hasTrainerHR && !$store.app.hrmConnected && !$store.app.hrmConnecting"
                                 style="display: none;"
                                 class="btn-sm w-full bg-rose-600 hover:bg-rose-700 text-white border-rose-600">
                                 <i data-lucide="heart-pulse"></i>
@@ -200,8 +200,12 @@
                     :style="{ backgroundColor: $store.app.heartRateBackground, borderColor: $store.app.heartRateBorder }">
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <div class="flex items-center gap-2">
-                            <i data-lucide="heart" class="size-4 text-muted-foreground"></i>
-                            <span class="text-sm text-muted-foreground font-medium">Heart Rate</span>
+                            <i data-lucide="heart" class="size-4"
+                                :class="$store.app.heartRateZone > 0 ? '' : 'text-muted-foreground'"
+                                :style="$store.app.heartRateZone > 0 ? { color: $store.app.heartRateColor } : {}"></i>
+                            <span class="text-sm font-medium"
+                                :class="$store.app.heartRateZone > 0 ? '' : 'text-muted-foreground'"
+                                :style="$store.app.heartRateZone > 0 ? { color: $store.app.heartRateColor } : {}">Heart Rate</span>
                         </div>
                         <span class="text-[0.65rem] font-semibold uppercase tracking-wide px-2 py-1 rounded-full text-white"
                             x-show="$store.app.heartRateZone > 0"

@@ -246,6 +246,7 @@ class App {
         if (connected) {
             if (window.Alpine) {
                 Alpine.store('app').setConnected(true, this.ftms.device?.name);
+                Alpine.store('app').setHasTrainerHR(this.ftms.hasTrainerHR);
             }
             this.chart.clear();
             this.updateQuickControlAvailability();
@@ -261,6 +262,7 @@ class App {
         if (window.Alpine) {
             Alpine.store('app').setConnected(false);
             Alpine.store('app').setHRMConnected(false);
+            Alpine.store('app').setHasTrainerHR(false);
         }
         this.updateQuickControlAvailability();
 

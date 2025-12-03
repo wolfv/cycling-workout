@@ -29,6 +29,7 @@ document.addEventListener('alpine:init', () => {
         hrmConnected: false,
         hrmConnecting: false,
         hrmDeviceName: null,
+        hasTrainerHR: false,  // Whether the trainer provides HR data
 
         // Metrics (flattened for better reactivity)
         power: 0,
@@ -85,6 +86,10 @@ document.addEventListener('alpine:init', () => {
 
         setHRMConnecting(connecting) {
             this.hrmConnecting = connecting;
+        },
+
+        setHasTrainerHR(hasHR) {
+            this.hasTrainerHR = hasHR;
         },
 
         updateMetrics(metrics) {
