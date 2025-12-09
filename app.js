@@ -375,8 +375,10 @@ class App {
         document.getElementById('summaryWork').textContent = `${stats.totalWork} kJ`;
         document.getElementById('summaryAvgHR').textContent = stats.avgHeartRate > 0 ? `${stats.avgHeartRate} bpm` : 'N/A';
 
-        // Show summary card
-        document.getElementById('workoutSummaryCard').style.display = 'block';
+        // Show summary card and remove hidden class
+        const summaryCard = document.getElementById('workoutSummaryCard');
+        summaryCard.style.display = 'block';
+        summaryCard.classList.remove('hidden');
 
         // Re-initialize icons
         setTimeout(() => lucide.createIcons(), 0);

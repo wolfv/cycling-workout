@@ -421,7 +421,15 @@ class WorkoutDesigner {
         }
 
         this.currentIntervalIndex = index;
-        this.intervalStartTime = Date.now();
+
+        // Calculate interval start time based on workout start time + accumulated previous intervals
+        // This ensures synchronization with other participants
+        let accumulatedTime = 0;
+        for (let i = 0; i < index; i++) {
+            accumulatedTime += this.intervals[i].duration * 1000;
+        }
+        this.intervalStartTime = this.workoutStartTime + accumulatedTime;
+
         const interval = this.intervals[index];
 
         const powerType = interval.powerType || 'relative';
