@@ -667,8 +667,8 @@
                 flags: [0, 1]
             };
 
-            // Speed (bit 0)
-            if (flags & 0x01) offset += 2;
+            // Speed (bit 0 = 0 means speed IS present, inverted logic!)
+            if (!(flags & 0x01)) offset += 2;
             // Average Speed (bit 1)
             if (flags & 0x02) offset += 2;
             // Instantaneous Cadence (bit 2)
@@ -684,8 +684,8 @@
             offset = 2;
             let cadence = null;
 
-            // Speed (bit 0)
-            if (flags & 0x01) {
+            // Speed (bit 0 = 0 means speed IS present, inverted logic!)
+            if (!(flags & 0x01)) {
                 const speed = dv.getUint16(offset, true);
                 log(`  Speed: ${speed / 100} km/h`, 'data');
                 offset += 2;
@@ -748,15 +748,15 @@
             // Skip Accumulated Torque (bit 1)
             if (flags & 0x02) offset += 2;
 
-            // Mark Wheel Revolution Data (bit 2)
-            if (flags & 0x04) {
+            // Mark Wheel Revolution Data (bit 4 = 0x10)
+            if (flags & 0x10) {
                 annotations.wheel = [offset, offset + 5];
                 offset += 6;
             }
 
             // Mark Crank Revolution Data (bit 5 = 0x20)
-            if (flags & 0x20 || flags & 0x08) {
-                annotations.crank = [offset, offset + 5];
+            if (flags & 0x20) {
+                annotations.crank = [offset, offset + 3];
             }
 
             // Display fancy hex dump with color-coded bytes
@@ -769,14 +769,14 @@
             metrics.power = power;
             updateMetrics();
 
-            // Parse flags
+            // Parse flags per Cycling Power Measurement spec
             const flagDetails = [];
             if (flags & 0x01) flagDetails.push('Pedal Power Balance');
-            if (flags & 0x02) flagDetails.push('Accumulated Torque');
-            if (flags & 0x04) flagDetails.push('Wheel Revolution Data');
-            if (flags & 0x08) flagDetails.push('Crank Revolution Data');
-            if (flags & 0x10) flagDetails.push('Extreme Force Magnitudes');
-            if (flags & 0x20) flagDetails.push('Extreme Torque Magnitudes');
+            if (flags & 0x02) flagDetails.push('Pedal Power Balance Reference');
+            if (flags & 0x04) flagDetails.push('Accumulated Torque');
+            if (flags & 0x08) flagDetails.push('Accumulated Torque Source');
+            if (flags & 0x10) flagDetails.push('Wheel Revolution Data');
+            if (flags & 0x20) flagDetails.push('Crank Revolution Data');
 
             if (flagDetails.length > 0) {
                 log(`  Flags present: ${flagDetails.join(', ')}`, 'data');
@@ -789,23 +789,21 @@
                 offset += 1;
             }
 
-            // Skip Accumulated Torque (bit 1)
-            if (flags & 0x02) {
+            // Skip Accumulated Torque (bit 2 = 0x04)
+            if (flags & 0x04) {
                 offset += 2;
             }
 
-            // Skip Wheel Revolution Data (bit 2)
-            if (flags & 0x04) {
+            // Skip Wheel Revolution Data (bit 4 = 0x10)
+            if (flags & 0x10) {
                 const wheelRevs = dv.getUint32(offset, true);
                 const wheelTime = dv.getUint16(offset + 4, true);
                 log(`  Wheel Revs: ${wheelRevs}, Time: ${wheelTime} (skipping for crank data)`, 'data');
                 offset += 6;
             }
 
-            // Crank Revolution Data (bit 5 = 0x20, NOT bit 3!)
-            // NOTE: The spec uses bit 5 for "Extreme Torque", but some use it for crank data
-            // We'll check BOTH bit 3 (0x08) and bit 5 (0x20)
-            if (flags & 0x20 || flags & 0x08) {
+            // Crank Revolution Data (bit 5 = 0x20)
+            if (flags & 0x20) {
                 log(`  🎯 Crank Revolution Data Present!`, 'info');
 
                 // Try both 16-bit and 32-bit interpretations
