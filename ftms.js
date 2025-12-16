@@ -426,10 +426,10 @@ class FTMSController {
                     const dv = new DataView(e.target.value.buffer);
                     const flags = dv.getUint16(0, true);
 
-                    // Debug: log raw bytes
-                    const bytes = new Uint8Array(e.target.value.buffer);
-                    const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    // console.log('Cycling Power:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(4, '0'));
+                    // Debug: log raw bytes (uncomment for debugging)
+                    // const bytes = new Uint8Array(e.target.value.buffer);
+                    // const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    // console.log('Cycling Power raw:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(4, '0'), 'len:', bytes.length);
 
                     // Power is always at offset 2
                     const power = dv.getInt16(2, true);
@@ -438,44 +438,44 @@ class FTMSController {
                     // Use Cycling Power Service as primary source for power
                     this.metrics.power = power;
 
-                    // Calculate offset for optional fields per Cycling Power Measurement spec
-                    let offset = 4; // Start after flags (2 bytes) and power (2 bytes)
+                    // Calculate offset for optional fields (same approach as debug.html)
+                    let offset = 4; // Start after flags (2) + power (2)
 
-                    // Pedal Power Balance Present (bit 0 = 0x01)
+                    // Skip Pedal Power Balance (bit 0 = 0x01)
                     if (flags & 0x01) {
                         offset += 1;
                     }
 
-                    // Accumulated Torque Present (bit 2 = 0x04)
+                    // Skip Accumulated Torque (bit 2 = 0x04)
                     if (flags & 0x04) {
                         offset += 2;
                     }
 
-                    // Wheel Revolution Data Present (bit 4 = 0x10)
+                    // Skip Wheel Revolution Data (bit 4 = 0x10)
                     if (flags & 0x10) {
                         offset += 6; // 4 bytes wheel revs + 2 bytes wheel time
                     }
 
-                    // Check if Crank Revolution Data Present (bit 5 = 0x20)
+                    // Crank Revolution Data (bit 5 = 0x20)
                     if (flags & 0x20) {
-                        // Crank revolution data present
-                        // Zwift Hub uses 32-bit cumulative crank revolutions (non-standard)
-                        const cumulativeCrankRevs = dv.getUint32(offset, true);
-                        const lastCrankEventTime = dv.getUint16(offset + 4, true); // in 1/1024 seconds
+                        // Standard spec: 16-bit crank revs + 16-bit time
+                        const cumulativeCrankRevs = dv.getUint16(offset, true);
+                        const lastCrankEventTime = dv.getUint16(offset + 2, true); // in 1/1024 seconds
 
                         // Calculate cadence from deltas (if we have previous values)
                         if (this.lastCrankRevs !== undefined && this.lastCrankTime !== undefined) {
-                            const revDelta = cumulativeCrankRevs - this.lastCrankRevs;
+                            // Handle 16-bit wrap-around
+                            const revDelta = (cumulativeCrankRevs - this.lastCrankRevs) & 0xFFFF;
                             const timeDelta = ((lastCrankEventTime - this.lastCrankTime) & 0xFFFF) / 1024.0; // seconds
 
-                            console.log('CP Crank data - revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime,
-                                        'delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
+                            // console.log('CP Crank data - revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime,
+                            //             'delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
 
                             if (timeDelta > 0 && revDelta > 0 && revDelta < 20) { // sanity check (increased limit since we're getting 2x)
                                 // Zwift Hub counts both pedal strokes, so divide by 2 for actual cadence
                                 const cadence = Math.round((revDelta / timeDelta) * 60 / 2); // RPM
                                 this.metrics.cadence = cadence;
-                                console.log('Cadence from Cycling Power:', cadence, 'RPM (raw:', Math.round((revDelta / timeDelta) * 60), ')');
+                                // console.log('Cadence from Cycling Power:', cadence, 'RPM');
 
                                 this.lastValidCadence = cadence;
                                 this.lastValidCadenceTime = Date.now();
@@ -490,7 +490,7 @@ class FTMSController {
                         this.lastCrankRevs = cumulativeCrankRevs;
                         this.lastCrankTime = lastCrankEventTime;
 
-                        offset += 6; // Skip past crank data
+                        offset += 4; // Skip past crank data (2 bytes revs + 2 bytes time)
                     } else {
                         // No crank data in this packet
                         if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
