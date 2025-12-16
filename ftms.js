@@ -250,8 +250,8 @@ class FTMSController {
 
                     let offset = 2;
 
-                    // Instantaneous Speed Present (bit 0)
-                    if (flags & 0x01) {
+                    // Instantaneous Speed Present (bit 0 = 0 means speed IS present, inverted logic!)
+                    if (!(flags & 0x01)) {
                         offset += 2; // Skip speed
                     }
 
@@ -438,8 +438,25 @@ class FTMSController {
                     // Use Cycling Power Service as primary source for power
                     this.metrics.power = power;
 
+                    // Calculate offset for optional fields per Cycling Power Measurement spec
+                    let offset = 4; // Start after flags (2 bytes) and power (2 bytes)
+
+                    // Pedal Power Balance Present (bit 0 = 0x01)
+                    if (flags & 0x01) {
+                        offset += 1;
+                    }
+
+                    // Accumulated Torque Present (bit 2 = 0x04)
+                    if (flags & 0x04) {
+                        offset += 2;
+                    }
+
+                    // Wheel Revolution Data Present (bit 4 = 0x10)
+                    if (flags & 0x10) {
+                        offset += 6; // 4 bytes wheel revs + 2 bytes wheel time
+                    }
+
                     // Check if Crank Revolution Data Present (bit 5 = 0x20)
-                    let offset = 4;
                     if (flags & 0x20) {
                         // Crank revolution data present
                         // Zwift Hub uses 32-bit cumulative crank revolutions (non-standard)

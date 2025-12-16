@@ -612,8 +612,8 @@ class App {
             slider.step = '1';
             slider.value = String(percent);
             this.pendingIntensityPercent = percent;
-            if (label) label.textContent = 'Workout Intensity';
-            if (buttonText) buttonText.textContent = 'Intensity Auto-Adjusts';
+            if (label) label.textContent = 'Effective FTP';
+            if (buttonText) buttonText.textContent = 'FTP Auto-Adjusts';
         } else {
             const manualRaw = Number.isFinite(this.manualTargetPower) ? this.manualTargetPower : 100;
             const manual = Math.max(0, Math.round(manualRaw));
@@ -650,23 +650,24 @@ class App {
         display.textContent = `${normalized}W`;
     }
 
-    updateQuickControlDisplayForIntensity(percent, targetPower) {
+    updateQuickControlDisplayForIntensity(percent) {
         const display = this.quickControlElements?.display;
         if (!display) return;
 
         const normalizedPercent = Number.isFinite(percent) ? Math.max(50, Math.min(150, Math.round(percent))) : (this.pendingIntensityPercent || 100);
         const activePercent = Math.max(1, Math.round(this.activeIntensityPercent || normalizedPercent));
-        const baselineTarget = Number.isFinite(targetPower) ? Math.round(targetPower) : this.getCurrentTargetPower();
 
-        if (Number.isFinite(baselineTarget) && baselineTarget > 0) {
-            if (normalizedPercent === activePercent) {
-                display.textContent = `${normalizedPercent}% (${baselineTarget}W)`;
-            } else {
-                const projected = Math.round(baselineTarget * (normalizedPercent / activePercent));
-                display.textContent = `${normalizedPercent}% (${baselineTarget}W → ${projected}W)`;
-            }
+        // Calculate effective FTP based on intensity scale
+        const baseFTP = window.workoutDesigner?.ftp || 200;
+        const effectiveFTP = Math.round(baseFTP * (normalizedPercent / 100));
+        const currentEffectiveFTP = Math.round(baseFTP * (activePercent / 100));
+
+        if (normalizedPercent === activePercent) {
+            // Show effective FTP with percentage reference
+            display.textContent = `${effectiveFTP}W FTP (${normalizedPercent}%)`;
         } else {
-            display.textContent = `${normalizedPercent}%`;
+            // Show transition from current to new effective FTP
+            display.textContent = `${effectiveFTP}W FTP (${currentEffectiveFTP}W → ${effectiveFTP}W)`;
         }
     }
 
@@ -762,7 +763,7 @@ class App {
         }
 
         if (this.quickControlMode === 'intensity') {
-            this.updateQuickControlDisplayForIntensity(this.pendingIntensityPercent, normalized);
+            this.updateQuickControlDisplayForIntensity(this.pendingIntensityPercent);
         } else {
             const slider = this.quickControlElements?.slider;
             if (slider) {
@@ -1153,7 +1154,7 @@ class App {
         this.raceTrack.setWorkout(workout.intervals, window.workoutDesigner.ftp);
 
         // Show notification
-        alert(`Workout received: ${workout.name || 'Unnamed Workout'}\n\nThe workout has been loaded and will scale to your FTP (${window.workoutDesigner.ftp}W).\n\nYou can adjust your FTP in the "My FTP" section above.`);
+        alert(`Workout received: ${workout.name || 'Unnamed Workout'}\n\nThe workout has been loaded and will scale to your FTP (${window.workoutDesigner.ftp}W).\n\nYou can:\n- Change your FTP in the "My FTP" section\n- Adjust workout intensity with the "Effective FTP" slider during the workout`);
     }
 
     handleSessionStart(startTime) {

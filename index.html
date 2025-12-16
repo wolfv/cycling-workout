@@ -9,7 +9,29 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/js/all.min.js" defer></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="alpine-store.js"></script>
+    <script>
+        // Cache-busting loader for version.js and early local scripts
+        (function() {
+            var timestamp = Date.now();
+
+            // Load version.js first
+            var versionScript = document.createElement('script');
+            versionScript.src = 'version.js?v=' + timestamp;
+            document.currentScript.parentNode.insertBefore(versionScript, document.currentScript);
+
+            // Load alpine-store.js with cache buster
+            document.write('<script src="alpine-store.js?v=' + timestamp + '"><\/script>');
+
+            // Update stylesheet with cache buster after version.js loads
+            window.addEventListener('load', function() {
+                var cacheBuster = window.APP_VERSION ? window.APP_VERSION.cacheBuster : timestamp;
+                var styleLink = document.querySelector('link[href^="style.css"]');
+                if (styleLink && styleLink.href.indexOf('?v=') === -1) {
+                    styleLink.href = 'style.css?v=' + cacheBuster;
+                }
+            });
+        })();
+    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body x-data="{}">
@@ -977,17 +999,28 @@ Return only the valid JSON, no additional explanation.</pre>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
-    <script src="ftms.js"></script>
-    <script src="chart.js"></script>
-    <script src="workout-preview.js"></script>
-    <script src="workout-progress.js"></script>
-    <script src="workout-recorder.js"></script>
-    <script src="workout-designer.js"></script>
-    <script src="hr-zones.js"></script>
-    <script src="session-p2p.js"></script>
-    <script src="racetrack.js"></script>
-    <script src="zwo-converter.js"></script>
-    <script src="app.js"></script>
+    <script>
+        // Load local scripts with cache busting
+        (function() {
+            var scripts = [
+                'ftms.js',
+                'chart.js',
+                'workout-preview.js',
+                'workout-progress.js',
+                'workout-recorder.js',
+                'workout-designer.js',
+                'hr-zones.js',
+                'session-p2p.js',
+                'racetrack.js',
+                'zwo-converter.js',
+                'app.js'
+            ];
+            var cacheBuster = window.APP_VERSION ? window.APP_VERSION.cacheBuster : Date.now();
+            scripts.forEach(function(src) {
+                document.write('<script src="' + src + '?v=' + cacheBuster + '"><\/script>');
+            });
+        })();
+    </script>
     <script>
         // Initialize Lucide icons
         lucide.createIcons();
@@ -1013,5 +1046,10 @@ Return only the valid JSON, no additional explanation.</pre>
             });
         })();
     </script>
+
+    <!-- Version Display -->
+    <div id="versionDisplay" style="position: fixed; bottom: 8px; left: 8px; font-size: 11px; color: var(--muted-foreground); font-family: monospace; opacity: 0.7; z-index: 1000; pointer-events: none;">
+        <span id="gitHash">loading...</span>
+    </div>
 </body>
 </html>
