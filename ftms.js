@@ -262,8 +262,8 @@ class FTMSController {
 
                     // Instantaneous Cadence Present (bit 2)
                     if (flags & 0x04) {
-                        // NOTE: This field doesn't seem to be real cadence on Zwift Hub, ignoring it
-                        // Will use Cycling Power Service crank revolutions instead
+                        const cadence = dv.getUint16(offset, true);
+                        this.metrics.cadence = cadence;
                         offset += 2;
                     }
 
@@ -284,8 +284,9 @@ class FTMSController {
 
                     // Instantaneous Power Present (bit 6)
                     if (flags & 0x40) {
-                        // NOTE: Power from Indoor Bike Data seems incorrect (stuck at 20W)
-                        // Using Cycling Power Service instead
+                        const power = dv.getInt16(offset, true);
+                        // Use Indoor Bike Data power as primary source
+                        this.metrics.power = power;
                         offset += 2;
                     }
 
@@ -435,8 +436,10 @@ class FTMSController {
                     const power = dv.getInt16(2, true);
                     // console.log('Power from Cycling Power Service at offset 2:', power, 'W');
 
-                    // Use Cycling Power Service as primary source for power
-                    this.metrics.power = power;
+                    // Only use Cycling Power if valid (non-zero), otherwise keep Indoor Bike Data power
+                    if (power > 0) {
+                        this.metrics.power = power;
+                    }
 
                     // Calculate offset for optional fields (same approach as debug.html)
                     let offset = 4; // Start after flags (2) + power (2)
@@ -491,12 +494,8 @@ class FTMSController {
                         this.lastCrankTime = lastCrankEventTime;
 
                         offset += 4; // Skip past crank data (2 bytes revs + 2 bytes time)
-                    } else {
-                        // No crank data in this packet
-                        if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
-                            this.metrics.cadence = 0;
-                        }
                     }
+                    // Note: If no crank data in Cycling Power, Indoor Bike Data will provide cadence
 
                     this.metrics.timestamp = Date.now();
                     if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);

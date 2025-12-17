@@ -18,6 +18,9 @@ class P2PSessionManager {
         this.onSessionStart = null;
         this.onSessionEnd = null;
 
+        // Clock sync - offset from host's clock (in ms)
+        this.clockOffset = 0;
+
         // Cloudflare Worker URL
         this.signalingUrl = 'wss://zwift-signaling.w-vollprecht.workers.dev';
     }
@@ -226,12 +229,21 @@ class P2PSessionManager {
         // P2P connection established! 🎉
         peer.on('connect', () => {
             console.log('✅ P2P connection established with', peerId);
-            // Share current workout if host
-            if (this.isHost && this.sharedWorkout) {
+
+            // Host sends clock sync and shares workout
+            if (this.isHost) {
+                // Send clock sync so participant can calculate offset
                 this.sendToPeer(peerId, {
-                    type: 'workout',
-                    workout: this.sharedWorkout
+                    type: 'clock-sync',
+                    hostTime: Date.now()
                 });
+
+                if (this.sharedWorkout) {
+                    this.sendToPeer(peerId, {
+                        type: 'workout',
+                        workout: this.sharedWorkout
+                    });
+                }
 
                 // If workout is in progress, send start time for sync
                 const workoutInfo = localStorage.getItem('workout_start_info');
@@ -239,7 +251,7 @@ class P2PSessionManager {
                     try {
                         const info = JSON.parse(workoutInfo);
                         // Only send if workout is still ongoing (within reasonable time)
-                        const elapsed = Date.now() - info.startTime;
+                        const elapsed = this.getSyncedTime() - info.startTime;
                         if (elapsed < 7200000) { // 2 hours max
                             this.sendToPeer(peerId, {
                                 type: 'start-countdown',
@@ -292,6 +304,14 @@ class P2PSessionManager {
     handleP2PMessage(fromPeerId, data) {
         // Handle messages received via direct P2P connection
         switch (data.type) {
+            case 'clock-sync':
+                // Calculate offset: how much our clock differs from host's
+                // Positive offset = our clock is ahead, negative = behind
+                const localTime = Date.now();
+                this.clockOffset = localTime - data.hostTime;
+                console.log(`Clock sync: host time ${data.hostTime}, local time ${localTime}, offset ${this.clockOffset}ms`);
+                break;
+
             case 'metrics':
                 const participant = this.participants.get(fromPeerId);
                 if (participant) {
@@ -317,7 +337,11 @@ class P2PSessionManager {
 
             case 'start-countdown':
                 if (this.onSessionStart) {
-                    this.onSessionStart(data.startTime);
+                    // startTime is in "true" UTC time (synced with time server)
+                    // Convert to local time by adding our clock offset
+                    const localStartTime = data.startTime + this.clockOffset;
+                    console.log(`Workout start: synced time ${data.startTime}, local time ${localStartTime}, offset ${this.clockOffset}ms`);
+                    this.onSessionStart(localStartTime);
                 }
                 break;
 
@@ -408,10 +432,12 @@ class P2PSessionManager {
     }
 
     startSynchronizedWorkout(countdownSeconds) {
+        // Host's local time - participants will adjust with their clock offset
         const startTime = Date.now() + (countdownSeconds * 1000);
+        console.log(`Starting workout at: ${startTime} (countdown: ${countdownSeconds}s)`);
         this.broadcast({
             type: 'start-countdown',
-            startTime
+            startTime  // In host's local time
         });
     }
 
