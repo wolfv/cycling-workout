@@ -9,6 +9,9 @@ class FTMSController {
         this.onLog = null;
         this.lastDeviceId = null;
 
+        // Track which service provides cadence (first one wins to prevent jumping values)
+        this.cadenceSource = null;
+
         // Secondary heart rate monitor
         this.hrmDevice = null;
         this.hrmServer = null;
@@ -365,10 +368,13 @@ class FTMSController {
                             console.log('CSC Delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
 
                             if (timeDelta > 0 && revDelta > 0 && revDelta < 20) {
-                                // Zwift Hub counts both pedal strokes, so divide by 2 for actual cadence
-                                const cadence = Math.round((revDelta / timeDelta) * 60 / 2); // RPM
-                                this.metrics.cadence = cadence;
-                                console.log('Cadence from CSC:', cadence, 'RPM (raw:', Math.round((revDelta / timeDelta) * 60), ')');
+                                const cadence = Math.round((revDelta / timeDelta) * 60); // RPM
+                                // Only update if we're the primary cadence source (first one wins)
+                                if (!this.cadenceSource || this.cadenceSource === 'csc') {
+                                    this.cadenceSource = 'csc';
+                                    this.metrics.cadence = cadence;
+                                }
+                                console.log('Cadence from CSC:', cadence, 'RPM');
 
                                 // Store last valid cadence and timestamp for timeout detection
                                 this.lastValidCadence = cadence;
@@ -474,10 +480,13 @@ class FTMSController {
                             // console.log('CP Crank data - revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime,
                             //             'delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
 
-                            if (timeDelta > 0 && revDelta > 0 && revDelta < 20) { // sanity check (increased limit since we're getting 2x)
-                                // Zwift Hub counts both pedal strokes, so divide by 2 for actual cadence
-                                const cadence = Math.round((revDelta / timeDelta) * 60 / 2); // RPM
-                                this.metrics.cadence = cadence;
+                            if (timeDelta > 0 && revDelta > 0 && revDelta < 20) {
+                                const cadence = Math.round((revDelta / timeDelta) * 60); // RPM
+                                // Only use power service cadence if CSC isn't providing it (CSC is preferred)
+                                if (this.cadenceSource !== 'csc') {
+                                    this.cadenceSource = 'power';
+                                    this.metrics.cadence = cadence;
+                                }
                                 // console.log('Cadence from Cycling Power:', cadence, 'RPM');
 
                                 this.lastValidCadence = cadence;
