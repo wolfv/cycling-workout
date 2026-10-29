@@ -21,6 +21,7 @@ const HR_ZONE_BORDERS = {
 document.addEventListener('alpine:init', () => {
     Alpine.store('app', {
         // Connection state
+        bluetoothSupported: Boolean(navigator.bluetooth && window.isSecureContext),
         connected: false,
         connecting: false,
         deviceName: null,
@@ -34,6 +35,7 @@ document.addEventListener('alpine:init', () => {
         // Metrics (flattened for better reactivity)
         power: 0,
         cadence: 0,
+        cadenceSource: null,
         heartRate: 0,
         heartRateZone: 0,
         heartRateColor: HR_ZONE_COLOR_DEFAULT,
@@ -55,7 +57,8 @@ document.addEventListener('alpine:init', () => {
         // Workout state
         workout: {
             active: false,
-            name: null,
+            loaded: false,
+            name: 'Custom workout',
             progress: 0,
             timeElapsed: 0,
             timeTotal: 0
@@ -64,7 +67,7 @@ document.addEventListener('alpine:init', () => {
         // UI state
         ui: {
             currentTab: 'ride',
-            targetPower: 100
+            targetPower: 0
         },
 
         // Methods
@@ -95,6 +98,7 @@ document.addEventListener('alpine:init', () => {
         updateMetrics(metrics) {
             this.power = Math.max(0, metrics.power || 0);
             this.cadence = Math.max(0, metrics.cadence || 0);
+            this.cadenceSource = metrics.cadenceSource || null;
             const hr = Math.max(0, Number(metrics.hr ?? metrics.heartRate ?? 0) || 0);
             this.heartRate = hr;
             this.applyHeartRateStyling(hr);
@@ -161,7 +165,6 @@ document.addEventListener('alpine:init', () => {
 
         clearWorkout() {
             this.workout.active = false;
-            this.workout.name = null;
             this.workout.progress = 0;
             this.workout.timeElapsed = 0;
         },

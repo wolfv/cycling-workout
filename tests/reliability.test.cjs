@@ -18,6 +18,8 @@ function harness() {
             return this.children.get(selector);
         },
         addEventListener(type, callback) { this.events[type] = callback; },
+        setAttribute(name, value) { this[name] = value; },
+        showModal() { this.open = true; }, close() { this.open = false; },
         appendChild() {}, replaceChildren() {}
     });
     const setTimer = (callback, delay, repeat = false) => {
@@ -497,6 +499,176 @@ test('charts support zero power and descending ramps without invalid coordinates
         race.drawIntervals(40, 100, 400);
     }
     assert.ok(coordinates.every(([, y]) => y >= 0));
+});
+
+async function cadenceSensors(h) {
+    const controller = new h.context.FTMSController();
+    const characteristics = new Map();
+    controller.notificationController = new AbortController();
+    controller.server = { getPrimaryService: async () => ({ getCharacteristic: async id => {
+        const characteristic = new EventTarget();
+        characteristic.startNotifications = async () => {};
+        characteristic.notify = bytes => {
+            // Real DataViews may point into a larger notification buffer.
+            const buffer = Uint8Array.from([255, 255, ...bytes, 255]);
+            characteristic.value = new DataView(buffer.buffer, 2, bytes.length);
+            characteristic.dispatchEvent(new Event('characteristicvaluechanged'));
+        };
+        characteristics.set(id, characteristic);
+        return characteristic;
+    } }) };
+    await controller.subscribeToMetrics();
+    return { controller, characteristics };
+}
+
+test('FTMS half-RPM units decode correctly, including DataView offsets and heart rate flags', async () => {
+    const h = harness();
+    const { controller, characteristics } = await cadenceSensors(h);
+    const ftms = characteristics.get(0x2ad2);
+    ftms.notify([0x45, 0x03, 180, 0, 200, 0, 0, 0, 0, 0, 0, 155]);
+    assert.equal(controller.metrics.cadence, 90);
+    assert.equal(controller.metrics.power, 200);
+    assert.equal(controller.metrics.hr, 155);
+    assert.equal(controller.metrics.cadenceSource, 'ftms');
+    // Average speed and instantaneous speed precede cadence when present.
+    ftms.notify([0x06, 0, 0, 0, 0, 0, 181, 0]);
+    assert.equal(controller.metrics.cadence, 91);
+    ftms.notify([0x45, 0, 200, 0]); // Missing power: do not accept partial data.
+    assert.equal(controller.metrics.cadence, 91);
+    ftms.notify([0x05, 0, 255, 255]); // Reserved / implausible cadence.
+    assert.equal(controller.metrics.cadence, 91);
+});
+
+test('concurrent cadence services cannot alternate the display between 1x and 2x', async () => {
+    const h = harness();
+    const { controller, characteristics } = await cadenceSensors(h);
+    const ftms = characteristics.get(0x2ad2);
+    const csc = characteristics.get(0x2a5b);
+    const power = characteristics.get(0x2a63);
+    ftms.notify([5, 0, 180, 0]);
+    csc.notify([2, 0, 0, 0, 0]);
+    power.notify([0x20, 0, 200, 0, 0, 0, 0, 0]);
+    csc.notify([2, 3, 0, 0, 4]); // 180 RPM from a conflicting source.
+    power.notify([0x20, 0, 200, 0, 3, 0, 0, 4]);
+    assert.equal(controller.metrics.cadence, 90);
+    assert.equal(controller.cadenceSource, 'ftms');
+    h.setTime(103001);
+    csc.notify([2, 5, 0, 0, 8]);
+    assert.equal(controller.metrics.cadence, 120);
+    assert.equal(controller.cadenceSource, 'csc');
+    ftms.notify([5, 0, 178, 0]);
+    assert.equal(controller.metrics.cadence, 89);
+    assert.equal(controller.cadenceSource, 'ftms');
+});
+
+test('crank cadence handles rollover, duplicate packets, stopping and missing notifications', async () => {
+    const h = harness();
+    const { controller, characteristics } = await cadenceSensors(h);
+    const csc = characteristics.get(0x2a5b);
+    csc.notify([2, 255, 255, 0, 254]);
+    csc.notify([2, 0, 0, 0, 2]);
+    assert.equal(controller.metrics.cadence, 60);
+    h.setTime(101000);
+    csc.notify([2, 0, 0, 0, 2]);
+    assert.equal(controller.metrics.cadence, 60);
+    h.setTime(103100);
+    csc.notify([2, 0, 0, 0, 2]);
+    assert.equal(controller.metrics.cadence, 0);
+    csc.notify([2, 1, 0, 0, 6]);
+    assert.equal(controller.metrics.cadence, 60);
+    await h.fire(controller.cadenceTimer);
+    assert.equal(controller.metrics.cadence, 0);
+    assert.equal(controller.metrics.cadenceSource, null);
+    controller.resetCadence();
+    assert.equal(h.timers.size, 0);
+    assert.equal(Object.keys(controller.crankSamples).length, 0);
+});
+
+test('Cycling Power cadence uses crank units after optional wheel, torque and balance fields', async () => {
+    const h = harness();
+    const { controller, characteristics } = await cadenceSensors(h);
+    const power = characteristics.get(0x2a63);
+    const prefix = [0x35, 0, 200, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0];
+    power.notify([...prefix, 10, 0, 0, 0]);
+    power.notify([...prefix, 13, 0, 0, 8]);
+    assert.equal(controller.metrics.cadence, 90);
+    assert.equal(controller.cadenceSource, 'power');
+    controller.updateCadence('csc', 88);
+    power.notify([...prefix, 16, 0, 0, 16]);
+    assert.equal(controller.metrics.cadence, 88);
+});
+
+test('interval dialog saves relative, absolute and ramp intervals without dropping zero targets', () => {
+    const h = harness();
+    const { d } = designer(h);
+    d.intervals = [{ ...steady, id: 123 }];
+    d.showEditDialog(d.intervals[0]);
+    assert.equal(h.elements.get('intervalDialog').open, true);
+    h.elements.get('intervalPowerType').value = 'ramp';
+    h.elements.get('intervalPower').value = '0';
+    h.elements.get('intervalRampEnd').value = '120';
+    h.elements.get('intervalDuration').value = '120';
+    d.saveIntervalEdit({ preventDefault() {} });
+    assert.equal(d.intervals[0].percentageLow, 0);
+    assert.equal(d.intervals[0].percentageHigh, 120);
+    assert.equal(d.intervals[0].id, 123);
+    assert.equal(h.elements.get('intervalDialog').open, false);
+    d.showEditDialog(d.intervals[0]);
+    h.elements.get('intervalPowerType').value = 'absolute';
+    h.elements.get('intervalPower').value = '180';
+    d.saveIntervalEdit({ preventDefault() {} });
+    assert.equal(d.intervals[0].power, 180);
+    assert.equal(d.intervals[0].percentageLow, undefined);
+    d.showEditDialog(d.intervals[0]);
+    h.elements.get('intervalDuration').value = '-10';
+    d.saveIntervalEdit({ preventDefault() {} });
+    assert.equal(d.intervals[0].duration, 120);
+    assert.ok(h.elements.get('intervalEditError').textContent);
+});
+
+test('dragging intervals can move them both earlier and later', () => {
+    const h = harness();
+    const { d } = designer(h);
+    const first = { ...steady, id: 1 };
+    const second = { ...ramp, id: 2 };
+    d.intervals = [first, second];
+    d.draggedInterval = first;
+    d.handleDrop({ preventDefault() {} }, second);
+    assert.equal(d.intervals[1], first);
+    d.handleDrop({ preventDefault() {} }, second);
+    assert.equal(d.intervals[0], first);
+});
+
+test('live chart retains two minutes, independent of Bluetooth notification frequency', () => {
+    const h = harness();
+    vm.runInContext(`${readFileSync(join(__dirname, '../chart.js'), 'utf8')}\nglobalThis.LiveChart = LiveChart;`, h.context);
+    const chart = Object.create(h.context.LiveChart.prototype);
+    Object.assign(chart, { maxDataPoints: 120, powerData: [], hrData: [], targetPowerData: [], timestamps: [], draw() {} });
+    for (let second = 0; second < 130; second++) {
+        for (let packet = 0; packet < 4; packet++) {
+            h.setTime(100000 + second * 1000 + packet * 200);
+            chart.addDataPoint(200 + packet, 150, 200);
+        }
+    }
+    assert.equal(chart.timestamps.length, 120);
+    assert.equal(chart.timestamps.at(-1) - chart.timestamps[0], 119000);
+    assert.equal(chart.powerData.at(-1), 203);
+});
+
+test('redesigned interface keeps unique element IDs and valid action handlers', () => {
+    const h = harness();
+    const html = readFileSync(join(__dirname, '../index.html'), 'utf8');
+    const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
+    assert.equal(new Set(ids).size, ids.length);
+    for (const match of html.matchAll(/\bon(?:click|change|input|submit)="([^"]+)"/g)) {
+        for (const call of match[1].matchAll(/\b(app|workoutDesigner)\.(\w+)\(/g)) {
+            const prototype = call[1] === 'app' ? h.context.App.prototype : h.context.WorkoutDesigner.prototype;
+            assert.equal(typeof prototype[call[2]], 'function', `${call[1]}.${call[2]} exists`);
+        }
+    }
+    for (const id of ['liveChart', 'workoutProgressChart', 'raceTrackCanvas', 'powerSlider', 'quickJoinName', 'workoutTimeline', 'devicesDialog', 'intervalDialog']) {
+        assert.ok(ids.includes(id), `${id} exists`);
+    }
 });
 
 test('countdown uses elapsed wall time, replaces old countdowns and cancels on session end', async () => {

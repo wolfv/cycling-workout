@@ -12,12 +12,12 @@ class LiveChart {
 
         // Styling
         this.colors = {
-            power: '#3b82f6',
-            hr: '#ef4444',
-            target: '#a1a1aa',
-            grid: '#27272a',
-            text: '#71717a',
-            bg: '#18181b'
+            power: '#c3ef73',
+            hr: '#f2a2a8',
+            target: '#a2ac9e',
+            grid: '#2a3227',
+            text: '#a2ac9e',
+            bg: '#191d19'
         };
 
         this.resize();
@@ -35,14 +35,20 @@ class LiveChart {
     }
 
     addDataPoint(power, hr, targetPower = null) {
-        const now = Date.now();
-        this.powerData.push(power);
-        this.hrData.push(hr);
+        const now = Math.floor(Date.now() / 1000) * 1000;
+        // Several Bluetooth services can notify per second; they share one chart sample.
+        if (this.timestamps[this.timestamps.length - 1] === now) {
+            this.powerData.pop();
+            this.hrData.pop();
+            this.targetPowerData.pop();
+            this.timestamps.pop();
+        }
+        this.powerData.push(Math.max(0, power || 0));
+        this.hrData.push(Math.max(0, hr || 0));
         this.targetPowerData.push(targetPower !== null ? targetPower : this.currentTargetPower);
         this.timestamps.push(now);
 
-        // Keep only recent data
-        if (this.powerData.length > this.maxDataPoints) {
+        while (this.timestamps[0] < now - (this.maxDataPoints - 1) * 1000) {
             this.powerData.shift();
             this.hrData.shift();
             this.targetPowerData.shift();
@@ -78,7 +84,9 @@ class LiveChart {
             ctx.fillStyle = this.colors.text;
             ctx.font = '14px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('No data yet - start pedaling!', this.width / 2, this.height / 2);
+            ctx.fillText('Your effort will appear here.', this.width / 2, this.height / 2);
+            ctx.font = '11px sans-serif';
+            ctx.fillText('Connect your trainer and start pedaling.', this.width / 2, this.height / 2 + 24);
             return;
         }
 
@@ -122,7 +130,9 @@ class LiveChart {
 
         // Helper function to get X coordinate
         const getX = (index) => {
-            return padding.left + (index / (this.maxDataPoints - 1)) * chartWidth;
+            const end = this.timestamps[this.timestamps.length - 1];
+            const age = (end - this.timestamps[index]) / 1000;
+            return padding.left + (1 - age / (this.maxDataPoints - 1)) * chartWidth;
         };
 
         // Draw target power line (dashed)

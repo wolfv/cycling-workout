@@ -9,7 +9,7 @@ class WorkoutPreview {
         const height = canvas.height;
 
         // Clear canvas
-        ctx.fillStyle = '#27272a';
+        ctx.fillStyle = '#191d19';
         ctx.fillRect(0, 0, width, height);
 
         if (!intervals || intervals.length === 0) return;
@@ -32,12 +32,12 @@ class WorkoutPreview {
 
         // Color mapping
         const colorMap = {
-            warmup: '#f59e0b',
-            endurance: '#3b82f6',
-            tempo: '#22c55e',
-            threshold: '#ef4444',
-            vo2max: '#a855f7',
-            cooldown: '#6366f1'
+            warmup: '#e7bb71',
+            endurance: '#78b4db',
+            tempo: '#a5cb78',
+            threshold: '#ee9390',
+            vo2max: '#b4a0de',
+            cooldown: '#91bfb9'
         };
 
         let x = 0;

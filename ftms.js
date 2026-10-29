@@ -22,6 +22,7 @@ class FTMSController {
             this.connectionGeneration++;
             this.ready = false;
             this.notificationController?.abort();
+            this.resetCadence();
             this.server = null;
             this.controlPointChar = null;
             if (this.pendingResponse) this.pendingResponse.finish(false);
@@ -32,8 +33,7 @@ class FTMSController {
             this.scheduleReconnect();
         };
 
-        // Track which service provides cadence (first one wins to prevent jumping values)
-        this.cadenceSource = null;
+        this.resetCadence();
 
         // Secondary heart rate monitor
         this.hrmDevice = null;
@@ -110,10 +110,7 @@ class FTMSController {
                 return false;
             }
             this.server = server;
-            this.cadenceSource = null;
-            this.lastCSCCrankRevs = this.lastCSCCrankTime = undefined;
-            this.lastCrankRevs = this.lastCrankTime = undefined;
-            this.lastValidCadenceTime = undefined;
+            this.resetCadence();
             this.hasTrainerHR = false;
             await this.subscribeToMetrics();
             if (generation !== this.connectionGeneration || !device.gatt.connected) return false;
@@ -319,6 +316,49 @@ class FTMSController {
         return this.hrmDevice && this.hrmDevice.gatt && this.hrmDevice.gatt.connected;
     }
 
+    resetCadence() {
+        clearTimeout(this.cadenceTimer);
+        this.cadenceTimer = null;
+        this.cadenceSource = null;
+        this.cadenceUpdatedAt = 0;
+        this.crankSamples = {};
+        this.metrics.cadence = 0;
+        this.metrics.cadenceSource = null;
+    }
+
+    updateCadence(source, rpm) {
+        if (!Number.isFinite(rpm) || rpm < 0 || rpm > 300) return;
+        const priority = { ftms: 0, csc: 1, power: 2 };
+        const now = Date.now();
+        if (this.cadenceSource && priority[source] > priority[this.cadenceSource] && now - this.cadenceUpdatedAt < 3000) return;
+        this.cadenceSource = source;
+        this.cadenceUpdatedAt = now;
+        this.metrics.cadence = Math.round(rpm);
+        this.metrics.cadenceSource = source;
+        clearTimeout(this.cadenceTimer);
+        this.cadenceTimer = setTimeout(() => {
+            this.cadenceSource = null;
+            this.metrics.cadence = 0;
+            this.metrics.cadenceSource = null;
+            this.onMetricsUpdate?.(this.metrics);
+        }, 3000);
+    }
+
+    updateCrankCadence(source, revolutions, ticks) {
+        const previous = this.crankSamples[source];
+        const now = Date.now();
+        if (previous && revolutions === previous.revolutions && ticks === previous.ticks) {
+            if (now - previous.changedAt >= 3000) this.updateCadence(source, 0);
+            return;
+        }
+        this.crankSamples[source] = { revolutions, ticks, changedAt: now };
+        if (!previous || now - previous.changedAt > 64000) return;
+        const revDelta = (revolutions - previous.revolutions) & 0xffff;
+        const tickDelta = (ticks - previous.ticks) & 0xffff;
+        // Both CSC and Cycling Power crank clocks use 1/1024 s (wheel clocks differ).
+        if (tickDelta > 0 && revDelta > 0) this.updateCadence(source, revDelta * 60 * 1024 / tickDelta);
+    }
+
     async subscribeToMetrics() {
         const server = this.server;
         const signal = this.notificationController.signal;
@@ -329,8 +369,15 @@ class FTMSController {
 
             indoorBikeChar.addEventListener('characteristicvaluechanged', (e) => {
                 try {
-                    const dv = new DataView(e.target.value.buffer);
+                    const dv = e.target.value;
                     const flags = dv.getUint16(0, true);
+                    // Optional field sizes in flag-bit order (bits 1–12).
+                    const fieldLengths = [2, 2, 2, 3, 2, 2, 2, 5, 1, 1, 2, 2];
+                    let requiredLength = (flags & 1) ? 2 : 4;
+                    for (let bit = 1; bit <= 12; bit++) {
+                        if (flags & (1 << bit)) requiredLength += fieldLengths[bit - 1];
+                    }
+                    if (dv.byteLength < requiredLength) throw new Error('Truncated Indoor Bike Data');
 
                     let offset = 2;
 
@@ -346,8 +393,8 @@ class FTMSController {
 
                     // Instantaneous Cadence Present (bit 2)
                     if (flags & 0x04) {
-                        const cadence = dv.getUint16(offset, true);
-                        this.metrics.cadence = cadence;
+                        // FTMS Instantaneous Cadence has a resolution of 0.5 RPM.
+                        this.updateCadence('ftms', dv.getUint16(offset, true) / 2);
                         offset += 2;
                     }
 
@@ -379,17 +426,9 @@ class FTMSController {
                         offset += 2;
                     }
 
-                    // Extended Energy fields (bits 8-11)
-                    if (flags & 0x100) { // Total Energy
-                        offset += 2;
-                    }
-                    if (flags & 0x200) { // Energy Per Hour
-                        offset += 2;
-                    }
-                    if (flags & 0x400) { // Energy Per Minute
-                        offset += 1;
-                    }
-                    if (flags & 0x800) { // Heart Rate
+                    // Expended Energy includes all three fields under bit 8.
+                    if (flags & 0x100) offset += 5;
+                    if (flags & 0x200) { // Heart Rate (bit 9)
                         const hr = dv.getUint8(offset);
                         if (hr > 0) {
                             this.metrics.hr = hr;
@@ -420,12 +459,8 @@ class FTMSController {
 
             cscChar.addEventListener('characteristicvaluechanged', (e) => {
                 try {
-                    const dv = new DataView(e.target.value.buffer);
+                    const dv = e.target.value;
                     const flags = dv.getUint8(0);
-
-                    const bytes = new Uint8Array(e.target.value.buffer);
-                    const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    console.log('CSC Measurement:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(2, '0'));
 
                     let offset = 1;
 
@@ -436,42 +471,7 @@ class FTMSController {
 
                     // Crank Revolution Data Present (bit 1)
                     if (flags & 0x02) {
-                        const cumulativeCrankRevs = dv.getUint16(offset, true);
-                        const lastCrankEventTime = dv.getUint16(offset + 2, true); // in 1/1024 seconds
-
-                        console.log('CSC Crank revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime);
-
-                        // Calculate cadence from deltas
-                        if (this.lastCSCCrankRevs !== undefined && this.lastCSCCrankTime !== undefined) {
-                            const revDelta = (cumulativeCrankRevs - this.lastCSCCrankRevs) & 0xFFFF;
-                            const timeDelta = ((lastCrankEventTime - this.lastCSCCrankTime) & 0xFFFF) / 1024.0;
-
-                            console.log('CSC Delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
-
-                            if (timeDelta > 0 && revDelta > 0 && revDelta < 20) {
-                                const cadence = Math.round((revDelta / timeDelta) * 60); // RPM
-                                // Only update if we're the primary cadence source (first one wins)
-                                if (!this.cadenceSource || this.cadenceSource === 'csc') {
-                                    this.cadenceSource = 'csc';
-                                    this.metrics.cadence = cadence;
-                                }
-                                console.log('Cadence from CSC:', cadence, 'RPM');
-
-                                // Store last valid cadence and timestamp for timeout detection
-                                this.lastValidCadence = cadence;
-                                this.lastValidCadenceTime = Date.now();
-                            } else if (timeDelta === 0 && revDelta === 0) {
-                                // Duplicate packet - keep current cadence but check for timeout
-                                if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
-                                    // No new data for 2 seconds, user stopped pedaling
-                                    this.metrics.cadence = 0;
-                                }
-                                // Otherwise keep the last valid cadence
-                            }
-                        }
-
-                        this.lastCSCCrankRevs = cumulativeCrankRevs;
-                        this.lastCSCCrankTime = lastCrankEventTime;
+                        this.updateCrankCadence('csc', dv.getUint16(offset, true), dv.getUint16(offset + 2, true));
                     }
 
                     this.metrics.timestamp = Date.now();
@@ -511,13 +511,8 @@ class FTMSController {
             const cpChar = await cpService.getCharacteristic(0x2a63);
             cpChar.addEventListener('characteristicvaluechanged', (e) => {
                 try {
-                    const dv = new DataView(e.target.value.buffer);
+                    const dv = e.target.value;
                     const flags = dv.getUint16(0, true);
-
-                    // Debug: log raw bytes (uncomment for debugging)
-                    // const bytes = new Uint8Array(e.target.value.buffer);
-                    // const hexDump = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    // console.log('Cycling Power raw:', hexDump, 'flags:', '0x' + flags.toString(16).padStart(4, '0'), 'len:', bytes.length);
 
                     // Power is always at offset 2
                     const power = dv.getInt16(2, true);
@@ -548,42 +543,7 @@ class FTMSController {
 
                     // Crank Revolution Data (bit 5 = 0x20)
                     if (flags & 0x20) {
-                        // Standard spec: 16-bit crank revs + 16-bit time
-                        const cumulativeCrankRevs = dv.getUint16(offset, true);
-                        const lastCrankEventTime = dv.getUint16(offset + 2, true); // in 1/1024 seconds
-
-                        // Calculate cadence from deltas (if we have previous values)
-                        if (this.lastCrankRevs !== undefined && this.lastCrankTime !== undefined) {
-                            // Handle 16-bit wrap-around
-                            const revDelta = (cumulativeCrankRevs - this.lastCrankRevs) & 0xFFFF;
-                            const timeDelta = ((lastCrankEventTime - this.lastCrankTime) & 0xFFFF) / 1024.0; // seconds
-
-                            // console.log('CP Crank data - revs:', cumulativeCrankRevs, 'time:', lastCrankEventTime,
-                            //             'delta revs:', revDelta, 'delta time:', timeDelta.toFixed(3), 's');
-
-                            if (timeDelta > 0 && revDelta > 0 && revDelta < 20) {
-                                const cadence = Math.round((revDelta / timeDelta) * 60); // RPM
-                                // Only use power service cadence if CSC isn't providing it (CSC is preferred)
-                                if (this.cadenceSource !== 'csc') {
-                                    this.cadenceSource = 'power';
-                                    this.metrics.cadence = cadence;
-                                }
-                                // console.log('Cadence from Cycling Power:', cadence, 'RPM');
-
-                                this.lastValidCadence = cadence;
-                                this.lastValidCadenceTime = Date.now();
-                            } else if (timeDelta === 0 && revDelta === 0) {
-                                // Duplicate - keep cadence but check timeout
-                                if (this.lastValidCadenceTime && (Date.now() - this.lastValidCadenceTime) > 2000) {
-                                    this.metrics.cadence = 0;
-                                }
-                            }
-                        }
-
-                        this.lastCrankRevs = cumulativeCrankRevs;
-                        this.lastCrankTime = lastCrankEventTime;
-
-                        offset += 4; // Skip past crank data (2 bytes revs + 2 bytes time)
+                        this.updateCrankCadence('power', dv.getUint16(offset, true), dv.getUint16(offset + 2, true));
                     }
                     // Note: If no crank data in Cycling Power, Indoor Bike Data will provide cadence
 
@@ -691,6 +651,7 @@ class FTMSController {
     disconnect() {
         this.connectionGeneration++;
         this.notificationController?.abort();
+        this.resetCadence();
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
         this.reconnectAttempts = 0;

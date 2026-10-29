@@ -1,6 +1,7 @@
 // Main Application
 class App {
     constructor() {
+        window.app = this;
         this.ftms = new FTMSController();
         this.chart = new LiveChart('liveChart', 120); // 2 minutes of data
         this.currentTab = 'ride';
@@ -30,7 +31,9 @@ class App {
                     // Keep the shared workout clock running through Bluetooth outages.
                     window.workoutDesigner.executeInterval(0);
                 } else {
-                    this.ftms.setTargetPower(0);
+                    this.ftms.setTargetPower(0).then(success => {
+                        if (success) this.updateTargetPowerUI(0);
+                    });
                 }
             }
         };
@@ -86,6 +89,7 @@ class App {
 
         // Auto-reconnect to last Bluetooth device
         this.attemptBluetoothReconnect();
+        lucide.createIcons();
     }
 
     // Generate a fun random rider name
@@ -182,10 +186,14 @@ class App {
 
     switchTab(tab) {
         // Update sidebar navigation links
-        document.querySelectorAll('.sidebar nav a').forEach(link => link.classList.remove('active'));
+        document.querySelectorAll('.app-nav a').forEach(link => {
+            link.classList.remove('active');
+            link.removeAttribute('aria-current');
+        });
         const navLink = document.getElementById(`nav-${tab}`);
         if (navLink) {
             navLink.classList.add('active');
+            navLink.setAttribute('aria-current', 'page');
         }
 
         // Update tab content
@@ -193,6 +201,7 @@ class App {
         document.getElementById(`content-${tab}`).classList.add('active');
 
         this.currentTab = tab;
+        if (window.Alpine) Alpine.store('app').switchTab(tab);
 
         if (tab === 'ride' && this.chart) {
             this.chart.resize();
@@ -222,7 +231,8 @@ class App {
             Alpine.store('app').updateMetrics({
                 power: Math.max(0, metrics.power || 0),
                 heartRate: metrics.hr || metrics.heartRate || 0,
-                cadence: metrics.cadence || 0
+                cadence: metrics.cadence || 0,
+                cadenceSource: metrics.cadenceSource
             });
         }
 
@@ -314,6 +324,11 @@ class App {
     }
 
     handleWorkoutStart() {
+        if (window.Alpine) {
+            Alpine.store('app').setWorkout(window.workoutDesigner.name,
+                window.workoutDesigner.intervals.reduce((sum, interval) => sum + interval.duration, 0));
+        }
+        document.getElementById('activeWorkoutName').textContent = window.workoutDesigner.name;
         this.setQuickControlMode('intensity');
         this.handleIntensityScaleChange(window.workoutDesigner.intensityScale);
 
@@ -343,7 +358,7 @@ class App {
         }, 10);
 
         // Start recording workout
-        const workoutName = 'Indoor Cycling Workout';
+        const workoutName = window.workoutDesigner.name;
         this.workoutRecorder.start(workoutName);
         this.log('Recording started', 'success');
 
@@ -353,6 +368,7 @@ class App {
 
     handleWorkoutStop() {
         localStorage.removeItem('workout_start_info');
+        if (window.Alpine) Alpine.store('app').clearWorkout();
         // Stop recording
         const dataPoints = this.workoutRecorder.stop();
         this.log(`Recording stopped: ${dataPoints} data points`, 'info');
@@ -405,6 +421,7 @@ class App {
         // Show workout control card again if we have intervals
         if (window.workoutDesigner.intervals.length > 0) {
             document.getElementById('workoutControlCard').classList.remove('hidden');
+            document.getElementById('workoutControlCard').style.display = 'block';
         }
 
         // Clear recorded data
@@ -455,12 +472,12 @@ class App {
         
         if (this.sessionManager && this.sessionManager.isConnected() && this.sessionManager.isHost) {
             // Show sync button for host, hide normal button
-            if (syncBtn) syncBtn.style.display = 'block';
+            if (syncBtn) syncBtn.style.display = 'inline-flex';
             if (normalBtn) normalBtn.style.display = 'none';
         } else {
             // Show normal button, hide sync button
             if (syncBtn) syncBtn.style.display = 'none';
-            if (normalBtn) normalBtn.style.display = 'block';
+            if (normalBtn) normalBtn.style.display = 'inline-flex';
         }
     }
 
@@ -475,7 +492,18 @@ class App {
 
     // Workout management
     saveWorkout() {
-        window.workoutDesigner.saveWorkout();
+        try {
+            if (!window.workoutDesigner.intervals.length) {
+                document.getElementById('saveWorkoutStatus').textContent = 'Add an interval before saving.';
+                return;
+            }
+            window.workoutDesigner.saveWorkout(document.getElementById('workoutName').value.trim() || 'Custom workout');
+            this.refreshWorkoutLibrary();
+            document.getElementById('saveWorkoutStatus').textContent = 'Saved to your workout library.';
+        } catch (error) {
+            this.log(`Could not save workout: ${error.message}`, 'error');
+            alert('Could not save this workout. Export a JSON backup before closing this tab.');
+        }
     }
 
     loadWorkout() {
@@ -627,8 +655,8 @@ class App {
             slider.step = '1';
             slider.value = String(percent);
             this.pendingIntensityPercent = percent;
-            if (label) label.textContent = 'Effective FTP';
-            if (buttonText) buttonText.textContent = 'FTP Auto-Adjusts';
+            if (label) label.textContent = 'Workout intensity';
+            if (buttonText) buttonText.textContent = 'Intensity applies automatically';
         } else {
             const manualRaw = Number.isFinite(this.manualTargetPower) ? this.manualTargetPower : 100;
             const manual = Math.max(0, Math.round(manualRaw));
@@ -670,20 +698,7 @@ class App {
         if (!display) return;
 
         const normalizedPercent = Number.isFinite(percent) ? Math.max(50, Math.min(150, Math.round(percent))) : (this.pendingIntensityPercent || 100);
-        const activePercent = Math.max(1, Math.round(this.activeIntensityPercent || normalizedPercent));
-
-        // Calculate effective FTP based on intensity scale
-        const baseFTP = window.workoutDesigner?.ftp || 200;
-        const effectiveFTP = Math.round(baseFTP * (normalizedPercent / 100));
-        const currentEffectiveFTP = Math.round(baseFTP * (activePercent / 100));
-
-        if (normalizedPercent === activePercent) {
-            // Show effective FTP with percentage reference
-            display.textContent = `${effectiveFTP}W FTP (${normalizedPercent}%)`;
-        } else {
-            // Show transition from current to new effective FTP
-            display.textContent = `${effectiveFTP}W FTP (${currentEffectiveFTP}W → ${effectiveFTP}W)`;
-        }
+        display.textContent = `${normalizedPercent}%`;
     }
 
     handleQuickControlInput() {
@@ -841,10 +856,14 @@ class App {
 
         if (names.length === 0) {
             library.innerHTML = `
-                <div style="grid-column: 1/-1; text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
-                    <i data-lucide="inbox" style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.5;"></i>
-                    <p style="font-size: 1rem;">No saved workouts yet</p>
-                    <p style="font-size: 0.875rem; margin-top: 0.5rem;">Design a workout and save it, or import a workout file</p>
+                <div class="library-empty">
+                    <i data-lucide="route"></i>
+                    <h2>Your next ride starts here.</h2>
+                    <p>Build a workout around your goals, or bring a JSON or ZWO file you already love.</p>
+                    <div class="button-row">
+                        <button class="btn" onclick="app.switchTab('design')">Build your first workout <i data-lucide="arrow-right"></i></button>
+                        <button class="btn-outline" onclick="app.importWorkout()">Import a workout</button>
+                    </div>
                 </div>
             `;
             setTimeout(() => lucide.createIcons(), 0);
@@ -929,7 +948,9 @@ class App {
         window.workoutDesigner.loadWorkout(name);
         // Show workout control card when loading from library
         document.getElementById('workoutControlCard').classList.remove('hidden');
-        this.switchTab('design');
+        document.getElementById('workoutControlCard').style.display = 'block';
+        this.updateWorkoutControlButtons();
+        this.switchTab('ride');
     }
 
     deleteWorkoutFromLibrary(name) {
@@ -1055,12 +1076,6 @@ class App {
             const result = await this.sessionManager.createSession(userName);
             this.log(`Session created: ${result.sessionId}`, 'success');
             this.updateSessionUI(result.sessionId, true);
-
-            // Close the popover by setting aria-hidden
-            const popoverContent = document.getElementById('session-popover-content');
-            const popoverTrigger = document.getElementById('session-popover-trigger');
-            popoverContent.setAttribute('aria-hidden', 'true');
-            popoverTrigger.setAttribute('aria-expanded', 'false');
         } catch (err) {
             console.error('quickCreateSession error:', err);
             alert('Failed to create session: ' + err.message);
@@ -1083,12 +1098,6 @@ class App {
             const result = await this.sessionManager.joinSession(sessionCode, userName);
             this.log(`Joined session: ${result.sessionId}`, 'success');
             this.updateSessionUI(result.sessionId, false);
-
-            // Close the popover by setting aria-hidden
-            const popoverContent = document.getElementById('session-popover-content');
-            const popoverTrigger = document.getElementById('session-popover-trigger');
-            popoverContent.setAttribute('aria-hidden', 'true');
-            popoverTrigger.setAttribute('aria-expanded', 'false');
         } catch (err) {
             alert('Failed to join session: ' + err.message);
             console.error(err);
@@ -1172,6 +1181,8 @@ class App {
             return;
         }
 
+        window.workoutDesigner.name = String(workout.name || 'Group workout');
+        document.getElementById('workoutName').value = window.workoutDesigner.name;
         // Don't override local FTP - each participant uses their own
         window.workoutDesigner.render();
         window.workoutDesigner.updateWorkoutInfo();
@@ -1222,7 +1233,7 @@ class App {
 
         // Reset host controls
         const startBtn = document.getElementById('startSyncedBtn');
-        if (startBtn) startBtn.style.display = 'block';
+        if (startBtn) startBtn.style.display = 'inline-flex';
         document.getElementById('endSyncedBtn')?.classList.add('hidden');
     }
 
@@ -1239,7 +1250,7 @@ class App {
 
         // Share workout with all participants
         const workout = {
-            name: 'Shared Workout',
+            name: window.workoutDesigner.name,
             intervals: window.workoutDesigner.intervals,
             ftp: window.workoutDesigner.ftp // Host's FTP as reference
         };
@@ -1297,7 +1308,7 @@ class App {
 
         // Reset host controls (if they exist)
         const startBtn = document.getElementById('startSyncedBtnSidebar');
-        if (startBtn) startBtn.style.display = 'block';
+        if (startBtn) startBtn.style.display = 'inline-flex';
     }
 
     openMeetLink() {

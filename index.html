@@ -1,1055 +1,1006 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cycling Workout Controller</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/basecoat.cdn.min.css">
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/js/all.min.js" defer></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script>
-        // Cache-busting loader for version.js and early local scripts
-        (function() {
-            var timestamp = Date.now();
+<!doctype html>
+<html lang="en" class="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#101310" />
+        <meta
+            name="description"
+            content="Your indoor training cockpit. Control your smart trainer, build workouts, and ride with friends."
+        />
+        <title>Cadence — Indoor cycling</title>
+        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/basecoat.cdn.min.css" />
+        <link rel="stylesheet" href="style.css" />
+        <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+        <script defer src="version.js"></script>
+        <script defer src="alpine-store.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+        <script defer src="ftms.js"></script>
+        <script defer src="chart.js"></script>
+        <script defer src="workout-preview.js"></script>
+        <script defer src="workout-progress.js"></script>
+        <script defer src="workout-recorder.js"></script>
+        <script defer src="workout-designer.js"></script>
+        <script defer src="hr-zones.js"></script>
+        <script defer src="session-p2p.js"></script>
+        <script defer src="racetrack.js"></script>
+        <script defer src="zwo-converter.js"></script>
+        <script defer src="app.js"></script>
+    </head>
+    <body x-data="{}">
+        <a class="skip-link" href="#main">Skip to content</a>
+        <aside class="app-sidebar">
+            <a
+                class="brand"
+                href="#ride"
+                onclick="
+                    app.switchTab('ride');
+                    return false;
+                "
+                aria-label="Cadence home"
+            >
+                <span class="brand-mark"><i data-lucide="activity"></i></span>
+                <span>cadence<span class="brand-caption">INDOOR CYCLING</span></span>
+            </a>
+            <div class="nav-label">YOUR TRAINING SPACE</div>
+            <nav class="app-nav" aria-label="Main navigation">
+                <a
+                    href="#ride"
+                    id="nav-ride"
+                    data-tab="ride"
+                    class="active"
+                    aria-current="page"
+                    onclick="
+                        app.switchTab('ride');
+                        return false;
+                    "
+                    ><i data-lucide="bike"></i><span>Ride</span><span class="nav-key">01</span></a
+                >
+                <a
+                    href="#workouts"
+                    id="nav-workouts"
+                    data-tab="workouts"
+                    onclick="
+                        app.switchTab('workouts');
+                        return false;
+                    "
+                    ><i data-lucide="library"></i><span>Workouts</span><span class="nav-key">02</span></a
+                >
+                <a
+                    href="#design"
+                    id="nav-design"
+                    data-tab="design"
+                    onclick="
+                        app.switchTab('design');
+                        return false;
+                    "
+                    ><i data-lucide="sliders-horizontal"></i><span>Builder</span><span class="nav-key">03</span></a
+                >
+                <a
+                    href="#session"
+                    id="nav-session"
+                    data-tab="session"
+                    onclick="
+                        app.switchTab('session');
+                        return false;
+                    "
+                    ><i data-lucide="users"></i><span>Group ride</span><span class="nav-key">04</span></a
+                >
+            </nav>
+            <div class="sidebar-bottom">
+                <div class="sidebar-note">
+                    <i data-lucide="radio"></i><strong>Your bike. Your pace.</strong>
+                    <p>No subscription. Just you, your trainer, and the next interval.</p>
+                </div>
+                <a
+                    class="source-link"
+                    href="https://github.com/wolfv/cycling-workout"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><i data-lucide="github"></i> Open source <i data-lucide="arrow-up-right"></i
+                ></a>
+                <span id="gitHash" class="version">Local development</span>
+            </div>
+        </aside>
 
-            // Load version.js first
-            var versionScript = document.createElement('script');
-            versionScript.src = 'version.js?v=' + timestamp;
-            document.currentScript.parentNode.insertBefore(versionScript, document.currentScript);
+        <div class="app-shell">
+            <header class="app-topbar">
+                <div class="topbar-label">
+                    <span class="status-dot" :class="{ online: $store.app.connected }"></span
+                    ><span x-text="$store.app.connected ? 'Trainer connected' : 'Your indoor training cockpit'"
+                        >Your indoor training cockpit</span
+                    >
+                </div>
+                <div class="button-row">
+                    <button
+                        class="btn-ghost device-button"
+                        onclick="document.getElementById('devicesDialog').showModal()"
+                        aria-label="Manage trainer and heart rate monitor"
+                    >
+                        <i data-lucide="settings-2"></i><span>Devices</span>
+                    </button>
+                    <button
+                        class="btn connect-button"
+                        x-show="!$store.app.connected"
+                        :disabled="$store.app.connecting"
+                        onclick="app.connect()"
+                    >
+                        <i data-lucide="bluetooth"></i
+                        ><span x-text="$store.app.connecting ? 'Connecting…' : 'Connect trainer'">Connect trainer</span>
+                    </button>
+                    <button
+                        class="connection-chip"
+                        x-show="$store.app.connected"
+                        x-cloak
+                        onclick="document.getElementById('devicesDialog').showModal()"
+                    >
+                        <span class="status-dot online"></span
+                        ><span x-text="$store.app.deviceName || 'Trainer ready'"></span
+                        ><i data-lucide="chevron-down"></i>
+                    </button>
+                </div>
+            </header>
 
-            // Load alpine-store.js with cache buster
-            document.write('<script src="alpine-store.js?v=' + timestamp + '"><\/script>');
+            <main id="main" tabindex="-1">
+                <noscript
+                    ><p class="notice">JavaScript is required to connect to your trainer and run workouts.</p></noscript
+                >
+                <div class="notice" x-show="!$store.app.bluetoothSupported" x-cloak>
+                    <i data-lucide="info"></i
+                    ><span
+                        >Bluetooth isn't available in this browser. You can still build workouts. To connect a trainer,
+                        use Chrome or Edge on a supported device over HTTPS or localhost.</span
+                    >
+                </div>
+                <div class="ride-countdown" id="countdownDisplay" style="display: none" role="status">
+                    <i data-lucide="timer"></i>
+                    <div>
+                        <strong>Your group ride is about to start</strong>
+                        <p>Get comfortable. Resistance will adjust automatically.</p>
+                    </div>
+                    <span class="countdown-value"><span id="countdownNumber">15</span><small>sec</small></span>
+                </div>
 
-            // Update stylesheet with cache buster after version.js loads
-            window.addEventListener('load', function() {
-                var cacheBuster = window.APP_VERSION ? window.APP_VERSION.cacheBuster : timestamp;
-                var styleLink = document.querySelector('link[href^="style.css"]');
-                if (styleLink && styleLink.href.indexOf('?v=') === -1) {
-                    styleLink.href = 'style.css?v=' + cacheBuster;
-                }
-            });
-        })();
-    </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-</head>
-<body x-data="{}">
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar" data-side="left" aria-hidden="false">
-        <nav aria-label="Main navigation">
-            <section class="scrollbar">
-                <div role="group">
-                    <div class="pb-4 border-b border-border">
-                        <div class="flex items-center gap-3 mb-4">
-                            <i data-lucide="bike" class="w-7 h-7 text-accent"></i>
-                            <h2 class="text-xl font-semibold">Cycling Workout</h2>
+                <section class="tab-content active" id="content-ride" aria-labelledby="ride-heading">
+                    <div class="page-heading">
+                        <div>
+                            <div class="eyebrow">MAKE TIME FOR THE RIDE</div>
+                            <h1 id="ride-heading">Find your rhythm<span class="accent">.</span></h1>
+                            <p>One interval at a time. We'll handle the resistance.</p>
                         </div>
-                        <div class="flex flex-col gap-2" x-data="{}">
-                            <button
-                                onclick="app.connect()"
-                                x-show="!$store.app.connected && !$store.app.connecting"
-                                style="display: none;"
-                                class="btn-sm w-full bg-blue-600 hover:bg-blue-700 text-white border-blue-600">
-                                <i data-lucide="bluetooth"></i>
-                                <span>Connect</span>
-                            </button>
-                            <button
-                                x-show="$store.app.connecting"
-                                style="display: none;"
-                                disabled
-                                class="btn-sm-outline w-full">
-                                <i data-lucide="loader" class="animate-spin"></i>
-                                <span>Connecting...</span>
-                            </button>
-                            <button
-                                onclick="app.disconnect()"
-                                x-show="$store.app.connected"
-                                style="display: none;"
-                                class="btn-sm-outline w-full">
-                                <i data-lucide="bluetooth-off"></i>
-                                <span>Disconnect</span>
-                            </button>
-                            <!-- HR Monitor Connect Button (only shown if trainer doesn't provide HR) -->
-                            <button
-                                onclick="app.connectHRM()"
-                                x-show="$store.app.connected && !$store.app.hasTrainerHR && !$store.app.hrmConnected && !$store.app.hrmConnecting"
-                                style="display: none;"
-                                class="btn-sm w-full bg-rose-600 hover:bg-rose-700 text-white border-rose-600">
-                                <i data-lucide="heart-pulse"></i>
-                                <span>Add HR Monitor</span>
-                            </button>
-                            <button
-                                x-show="$store.app.hrmConnecting"
-                                style="display: none;"
-                                disabled
-                                class="btn-sm-outline w-full">
-                                <i data-lucide="loader" class="animate-spin"></i>
-                                <span>Connecting HRM...</span>
-                            </button>
-                            <button
-                                onclick="app.disconnectHRM()"
-                                x-show="$store.app.hrmConnected"
-                                style="display: none;"
-                                class="btn-sm-outline w-full text-rose-500 border-rose-500/50 hover:bg-rose-500/10">
-                                <i data-lucide="heart-off"></i>
-                                <span x-text="'HR: ' + ($store.app.hrmDeviceName || 'Connected')"></span>
-                            </button>
-                        </div>
+                        <button class="btn-outline" onclick="app.switchTab('session')">
+                            <i data-lucide="users"></i
+                            ><span x-text="$store.app.session.active ? 'View group ride' : 'Ride with friends'"
+                                >Ride with friends</span
+                            ><i data-lucide="arrow-up-right"></i>
+                        </button>
                     </div>
 
-                    <ul>
-                        <li>
-                            <a href="#" onclick="app.switchTab('ride'); return false;" id="nav-ride" class="active">
-                                <i data-lucide="bike"></i>
-                                <span>Ride</span>
-                            </a>
-                        </li>
-                        <li>
-                        <!-- Group Countdown -->
-                        <div id="countdownDisplay" class="ride-countdown" style="display: none;">
-                            <div class="ride-countdown-card">
-                                <div class="ride-countdown-heading">
-                                    <i data-lucide="alarm-clock" class="size-4"></i>
-                                    <span>Group Start In</span>
-                                </div>
-                                <div class="ride-countdown-timer">
-                                    <span id="countdownNumber">5</span>
-                                    <small>s</small>
-                                </div>
-                                <p>Stay ready – the workout begins automatically.</p>
+                    <div class="metrics-grid" aria-label="Live ride metrics">
+                        <article class="metric metric-power">
+                            <div class="metric-label">
+                                <i data-lucide="zap"></i> Power
+                                <span class="metric-tag" x-text="$store.app.connected ? 'LIVE' : 'WAITING'"
+                                    >WAITING</span
+                                >
                             </div>
-                        </div>
+                            <div class="metric-reading">
+                                <span id="powerValue" x-text="$store.app.connected ? $store.app.power : '—'">—</span
+                                ><small>W</small>
+                            </div>
+                            <div class="metric-foot">Your output, right now</div>
+                            <div class="metric-decoration" aria-hidden="true"></div>
+                        </article>
+                        <article class="metric">
+                            <div class="metric-label"><i data-lucide="target"></i> Target power</div>
+                            <div class="metric-reading">
+                                <span
+                                    id="targetPowerValue"
+                                    x-text="$store.app.connected ? $store.app.ui.targetPower : '—'"
+                                    >—</span
+                                ><small>W</small>
+                            </div>
+                            <div
+                                class="metric-foot"
+                                x-text="$store.app.workout.active ? 'Following your workout' : 'Manual ERG control'"
+                            >
+                                Manual ERG control
+                            </div>
+                        </article>
+                        <article class="metric">
+                            <div class="metric-label"><i data-lucide="gauge"></i> Cadence</div>
+                            <div class="metric-reading">
+                                <span id="cadenceValue" x-text="$store.app.connected ? $store.app.cadence : '—'">—</span
+                                ><small>rpm</small>
+                            </div>
+                            <div
+                                class="metric-foot"
+                                x-text="$store.app.cadenceSource ? 'Sensor · ' + $store.app.cadenceSource.toUpperCase() : 'Waiting for pedal strokes'"
+                            >
+                                Waiting for pedal strokes
+                            </div>
+                        </article>
+                        <article class="metric metric-heart">
+                            <div class="metric-label">
+                                <i data-lucide="heart"></i> Heart rate
+                                <span
+                                    class="zone-badge"
+                                    x-show="$store.app.heartRateZone"
+                                    x-cloak
+                                    :style="{color: $store.app.heartRateColor}"
+                                    x-text="'Z' + $store.app.heartRateZone"
+                                ></span>
+                            </div>
+                            <div class="metric-reading">
+                                <span id="heartRateValue" x-text="$store.app.heartRate || '—'">—</span
+                                ><small>bpm</small>
+                            </div>
+                            <div
+                                class="metric-foot"
+                                x-text="$store.app.heartRate ? $store.app.heartRateZoneName : 'Pair a heart rate monitor'"
+                            >
+                                Pair a heart rate monitor
+                            </div>
+                        </article>
+                    </div>
 
-                            <a href="#" onclick="app.switchTab('design'); return false;" id="nav-design">
-                                <i data-lucide="pencil"></i>
-                                <span>Design Workout</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" onclick="app.switchTab('workouts'); return false;" id="nav-workouts">
-                                <i data-lucide="library"></i>
-                                <span>Workouts</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" onclick="app.switchTab('session'); return false;" id="nav-session">
-                                <i data-lucide="users"></i>
-                                <span>Session</span>
-                            </a>
-                        </li>
-                    </ul>
-
-                    <!-- GitHub Link -->
-                    <a href="https://github.com/wolfv/cycling-workout" target="_blank" rel="noopener noreferrer"
-                       class="flex items-center gap-3 p-3 mx-3 mb-3 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground group border border-border">
-                        <i data-lucide="github" class="size-5 group-hover:scale-110 transition-transform"></i>
-                        <div class="flex-1 text-sm">
-                            <div class="font-medium">Open Source</div>
-                            <div class="text-xs opacity-75">Contribute on GitHub</div>
-                        </div>
-                        <i data-lucide="external-link" class="size-4"></i>
-                    </a>
-                </div>
-            </section>
-        </nav>
-    </aside>
-
-    <main class="p-8 max-w-[1600px] mx-auto">
-        <!-- Mobile sidebar toggle -->
-        <div class="p-4 hidden md:hidden" id="mobile-nav-toggle">
-            <button type="button" onclick="document.dispatchEvent(new CustomEvent('basecoat:sidebar'))" class="btn-outline">
-                <i data-lucide="menu"></i>
-                <span>Menu</span>
-            </button>
-        </div>
-
-        <!-- Ride Tab -->
-        <div class="tab-content active" id="content-ride">
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
-            <!-- Main Content -->
-            <div class="flex flex-col gap-6">
-                <!-- Session Controls -->
-                <div class="flex gap-3 items-center justify-end">
-                    <!-- Join Session Popover (when not connected) -->
-                    <div class="popover" x-show="!$store.app.session.active">
-                        <button id="session-popover-trigger" type="button" aria-expanded="false" aria-controls="session-popover-content" class="btn-outline">
-                            <i data-lucide="users"></i>
-                            <span>Join Session</span>
-                        </button>
-                        <div id="session-popover-content" data-popover aria-hidden="true" class="w-80">
-                            <div class="grid gap-4">
-                                <header class="grid gap-1.5">
-                                    <h4 class="leading-none font-medium">Join or Create Session</h4>
-                                    <p class="text-muted-foreground text-sm">Ride with friends in real-time!</p>
+                    <div class="ride-layout">
+                        <div class="ride-main">
+                            <article class="card active-workout" id="activeWorkoutCard" style="display: none">
+                                <header class="panel-heading">
+                                    <h2>
+                                        <span class="status-dot online"></span
+                                        ><span id="activeWorkoutName">Workout in progress</span>
+                                    </h2>
+                                    <span class="eyebrow">ERG MODE</span>
                                 </header>
-                                <form class="form grid gap-4" onsubmit="app.quickJoinSession(); return false;">
-                                    <div class="grid gap-2">
-                                        <label for="quickJoinName">Your Name</label>
-                                        <input type="text" id="quickJoinName" placeholder="Rider name" value="Rider" class="h-8">
+                                <section>
+                                    <div class="interval-focus">
+                                        <div>
+                                            <div class="eyebrow">RIGHT NOW</div>
+                                            <h3 id="currentIntervalName">—</h3>
+                                            <p id="currentIntervalTarget">—</p>
+                                            <div
+                                                id="currentIntervalCountdown"
+                                                class="interval-countdown"
+                                                style="display: none"
+                                            >
+                                                Next interval in <span id="countdownSeconds">—</span>
+                                            </div>
+                                        </div>
+                                        <div class="next-interval">
+                                            <div class="eyebrow">UP NEXT <i data-lucide="arrow-right"></i></div>
+                                            <strong id="nextIntervalName">—</strong
+                                            ><span id="nextIntervalTarget">—</span>
+                                        </div>
                                     </div>
-                                    <div class="grid gap-2">
-                                        <label for="quickJoinSessionCode">Session Code</label>
-                                        <input type="text" id="quickJoinSessionCode" placeholder="Paste code to join" class="h-8">
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <button type="submit" class="btn">
-                                            <i data-lucide="users"></i>
-                                            Join
+                                    <canvas
+                                        id="workoutProgressChart"
+                                        width="800"
+                                        height="140"
+                                        aria-label="Workout interval profile and progress"
+                                        role="img"
+                                    ></canvas>
+                                    <div class="workout-footer">
+                                        <span id="workoutProgressTime" class="mono">0:00 / 0:00</span
+                                        ><button
+                                            id="stopWorkoutBtn"
+                                            class="btn-destructive"
+                                            onclick="workoutDesigner.stopWorkout()"
+                                        >
+                                            <i data-lucide="square"></i> End ride
                                         </button>
-                                        <button type="button" onclick="app.quickCreateSession()" class="btn-outline">
-                                            <i data-lucide="plus-circle"></i>
-                                            Create New
+                                    </div>
+                                </section>
+                            </article>
+
+                            <article class="card chart-card">
+                                <header class="panel-heading">
+                                    <div>
+                                        <h2>Live effort</h2>
+                                        <p>Your last two minutes, in perspective.</p>
+                                    </div>
+                                    <span class="chart-live"
+                                        ><span class="status-dot" :class="{online: $store.app.connected}"></span
+                                        ><span x-text="$store.app.connected ? 'LIVE' : 'STANDBY'">STANDBY</span></span
+                                    >
+                                </header>
+                                <section>
+                                    <canvas
+                                        id="liveChart"
+                                        width="800"
+                                        height="280"
+                                        aria-label="Live power, target power, and heart rate chart"
+                                        role="img"
+                                    ></canvas>
+                                </section>
+                            </article>
+
+                            <article class="card" id="workoutSummaryCard" style="display: none">
+                                <header class="panel-heading">
+                                    <div>
+                                        <div class="eyebrow accent">RIDE SAVED IN THIS TAB</div>
+                                        <h2>Nice work. Make it count.</h2>
+                                    </div>
+                                    <i data-lucide="circle-check" class="accent"></i>
+                                </header>
+                                <section>
+                                    <div class="summary-grid">
+                                        <div><span>Duration</span><strong id="summaryDuration">—</strong></div>
+                                        <div><span>Average power</span><strong id="summaryAvgPower">—</strong></div>
+                                        <div><span>Peak power</span><strong id="summaryMaxPower">—</strong></div>
+                                        <div><span>Average cadence</span><strong id="summaryAvgCadence">—</strong></div>
+                                        <div><span>Total work</span><strong id="summaryWork">—</strong></div>
+                                        <div><span>Average heart rate</span><strong id="summaryAvgHR">—</strong></div>
+                                    </div>
+                                    <div class="button-row">
+                                        <button class="btn" onclick="app.downloadWorkoutTCX()">
+                                            <i data-lucide="download"></i> Download TCX</button
+                                        ><button class="btn-outline" onclick="app.downloadWorkoutJSON()">
+                                            Download JSON</button
+                                        ><button class="btn-ghost" onclick="app.dismissWorkoutSummary()">
+                                            Dismiss
                                         </button>
                                     </div>
+                                    <p class="help-text">
+                                        Download before closing this tab. Upload your TCX to
+                                        <a
+                                            href="https://www.strava.com/upload/select"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            >Strava</a
+                                        >, Garmin Connect, or TrainingPeaks.
+                                    </p>
+                                </section>
+                            </article>
+
+                            <article class="card participants-strip" x-show="$store.app.session.active" x-cloak>
+                                <header class="panel-heading">
+                                    <h2>
+                                        <i data-lucide="users"></i> In good company
+                                        <span class="count-badge" x-text="$store.app.riderCount"></span>
+                                    </h2>
+                                    <button class="btn-ghost" onclick="app.switchTab('session')">
+                                        View group <i data-lucide="arrow-right"></i>
+                                    </button>
+                                </header>
+                                <section class="participants-strip-list" tabindex="0" aria-label="Live rider metrics">
+                                    <template
+                                        x-for="participant in $store.app.session.participants"
+                                        :key="participant.id"
+                                        ><div class="participant-pill">
+                                            <div class="participant-pill-header">
+                                                <strong x-text="participant.name"></strong
+                                                ><span
+                                                    class="tiny-label"
+                                                    x-text="participant.isSelf ? 'YOU' : participant.isHost ? 'HOST' : ''"
+                                                ></span>
+                                            </div>
+                                            <div class="participant-pill-metrics">
+                                                <span><b x-text="participant.power"></b> W</span
+                                                ><span><b x-text="participant.cadence"></b> rpm</span
+                                                ><span class="heart"
+                                                    ><b x-text="participant.heartRate || '—'"></b> bpm</span
+                                                >
+                                            </div>
+                                        </div></template
+                                    >
+                                </section>
+                            </article>
+                        </div>
+
+                        <aside class="ride-controls" aria-label="Ride controls">
+                            <article class="card control-card">
+                                <header class="panel-heading">
+                                    <h2><i data-lucide="sliders-horizontal"></i> Your effort</h2>
+                                    <span
+                                        class="tiny-label"
+                                        x-text="$store.app.workout.active ? 'WORKOUT' : 'FREE RIDE'"
+                                        >FREE RIDE</span
+                                    >
+                                </header>
+                                <section>
+                                    <label id="quickControlLabel" for="powerSlider">Target power</label
+                                    ><output id="powerDisplay" for="powerSlider">100W</output
+                                    ><input
+                                        class="input"
+                                        type="range"
+                                        id="powerSlider"
+                                        min="0"
+                                        max="500"
+                                        step="1"
+                                        value="100"
+                                        oninput="app.handleQuickControlInput()"
+                                        onchange="app.handleQuickControlCommit()"
+                                    />
+                                    <div class="range-labels">
+                                        <span x-text="$store.app.workout.active ? '50% intensity' : '0 W'">0 W</span
+                                        ><span x-text="$store.app.workout.active ? '150% intensity' : '500 W'"
+                                            >500 W</span
+                                        >
+                                    </div>
+                                    <button
+                                        id="setPowerBtn"
+                                        class="btn full-width"
+                                        disabled
+                                        onclick="app.handleQuickControlAction()"
+                                    >
+                                        <i data-lucide="arrow-up-right"></i><span>Set power</span>
+                                    </button>
+                                    <p
+                                        class="help-text"
+                                        x-text="$store.app.workout.active ? 'Adjust intensity without changing your workout. Applied when you release the slider.' : $store.app.connected ? 'Choose your watts, then apply. Your trainer handles the resistance.' : 'Connect your trainer to control resistance.'"
+                                    >
+                                        Connect your trainer to control resistance.
+                                    </p>
+                                </section>
+                            </article>
+
+                            <article class="card workout-ready" id="workoutControlCard">
+                                <section>
+                                    <div class="eyebrow">YOUR NEXT RIDE</div>
+                                    <div x-show="!$store.app.workout.loaded">
+                                        <div class="empty-icon"><i data-lucide="route"></i></div>
+                                        <h2>A little structure.<br />A stronger ride.</h2>
+                                        <p>Pick a workout, or build your own. Every interval scales to your FTP.</p>
+                                        <button class="btn-outline full-width" onclick="app.switchTab('workouts')">
+                                            Find a workout <i data-lucide="arrow-right"></i>
+                                        </button>
+                                    </div>
+                                    <div x-show="$store.app.workout.loaded" x-cloak>
+                                        <h2 x-text="$store.app.workout.name || 'Custom workout'"></h2>
+                                        <p id="workoutReadyInfo"></p>
+                                        <button
+                                            id="startWorkoutBtn"
+                                            class="btn full-width"
+                                            onclick="workoutDesigner.startWorkout()"
+                                        >
+                                            <i data-lucide="play"></i> Start workout</button
+                                        ><button
+                                            id="startSyncedBtnSidebar"
+                                            class="btn full-width"
+                                            style="display: none"
+                                            onclick="app.startSyncedWorkout()"
+                                        >
+                                            <i data-lucide="users"></i> Start for everyone</button
+                                        ><button class="btn-ghost full-width" onclick="app.switchTab('design')">
+                                            Edit workout
+                                        </button>
+                                    </div>
+                                </section>
+                            </article>
+                            <div class="ride-tip">
+                                <i data-lucide="sun"></i>
+                                <p>
+                                    Keep this tab visible and your screen awake. Your trainer needs an active connection
+                                    to follow the workout.
+                                </p>
+                            </div>
+                        </aside>
+                    </div>
+                    <details class="card activity-log-card">
+                        <summary>
+                            <span><i data-lucide="terminal"></i> Connection & activity log</span
+                            ><i data-lucide="chevron-down" class="chevron-rotate"></i>
+                        </summary>
+                        <div
+                            id="log"
+                            class="activity-log-stream"
+                            tabindex="0"
+                            role="log"
+                            aria-live="off"
+                            aria-label="Connection and workout events"
+                        ></div>
+                    </details>
+                </section>
+
+                <section class="tab-content" id="content-workouts" aria-labelledby="library-heading">
+                    <div class="page-heading">
+                        <div>
+                            <div class="eyebrow">A PLAN FOR YOUR PEDALS</div>
+                            <h1 id="library-heading">Your workout library<span class="accent">.</span></h1>
+                            <p>Saved on this device. Ready when you are.</p>
+                        </div>
+                        <div class="button-row">
+                            <button class="btn-outline" onclick="app.importWorkout()">
+                                <i data-lucide="upload"></i> Import JSON</button
+                            ><button class="btn" onclick="app.switchTab('design')">
+                                <i data-lucide="plus"></i> Build a workout
+                            </button>
+                        </div>
+                    </div>
+                    <div id="workoutLibrary" class="library-grid"></div>
+                    <div class="library-note">
+                        <i data-lucide="folder-open"></i>
+                        <p>
+                            Have a Zwift workout?
+                            <button class="text-link" onclick="app.importZwo()">Import a .zwo file</button>. Export your
+                            saved workouts to keep a backup or share them with friends.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="tab-content" id="content-design" aria-labelledby="builder-heading">
+                    <div class="page-heading">
+                        <div>
+                            <div class="eyebrow">TRAIN WITH INTENTION</div>
+                            <h1 id="builder-heading">Make it your own<span class="accent">.</span></h1>
+                            <p>Add intervals. Set your effort. Find your next gear.</p>
+                        </div>
+                        <button class="btn" onclick="app.loadWorkoutForRide()">
+                            <i data-lucide="play"></i> Load & ride
+                        </button>
+                    </div>
+                    <div class="builder-layout">
+                        <div class="builder-main">
+                            <article class="card">
+                                <header class="panel-heading">
+                                    <div class="workout-name-field">
+                                        <label class="eyebrow" for="workoutName">WORKOUT NAME</label
+                                        ><input
+                                            id="workoutName"
+                                            class="input"
+                                            value="Custom workout"
+                                            maxlength="120"
+                                            oninput="
+                                                workoutDesigner.name = this.value.trim() || 'Custom workout';
+                                                workoutDesigner.updateWorkoutInfo();
+                                            "
+                                        />
+                                    </div>
+                                    <div class="ftp-field">
+                                        <label for="ftpInput">YOUR FTP</label>
+                                        <div>
+                                            <input
+                                                class="input"
+                                                id="ftpInput"
+                                                type="number"
+                                                min="50"
+                                                max="500"
+                                                value="200"
+                                                onchange="app.updateFTP()"
+                                            /><span>W</span>
+                                        </div>
+                                    </div>
+                                </header>
+                                <section>
+                                    <div class="builder-toolbar">
+                                        <span class="eyebrow">ADD AN INTERVAL</span
+                                        ><button class="btn-ghost" onclick="workoutDesigner.clearWorkout()">
+                                            <i data-lucide="trash-2"></i> Clear
+                                        </button>
+                                    </div>
+                                    <div class="interval-presets">
+                                        <button class="preset warmup" onclick="workoutDesigner.addInterval('warmup')">
+                                            <i data-lucide="sunrise"></i><strong>Warmup</strong
+                                            ><small>50% FTP</small></button
+                                        ><button
+                                            class="preset endurance"
+                                            onclick="workoutDesigner.addInterval('endurance')"
+                                        >
+                                            <i data-lucide="gauge"></i><strong>Endurance</strong
+                                            ><small>65% FTP</small></button
+                                        ><button class="preset tempo" onclick="workoutDesigner.addInterval('tempo')">
+                                            <i data-lucide="trending-up"></i><strong>Tempo</strong
+                                            ><small>85% FTP</small></button
+                                        ><button
+                                            class="preset threshold"
+                                            onclick="workoutDesigner.addInterval('threshold')"
+                                        >
+                                            <i data-lucide="flame"></i><strong>Threshold</strong
+                                            ><small>100% FTP</small></button
+                                        ><button class="preset vo2max" onclick="workoutDesigner.addInterval('vo2max')">
+                                            <i data-lucide="rocket"></i><strong>VO₂ max</strong
+                                            ><small>120% FTP</small></button
+                                        ><button
+                                            class="preset cooldown"
+                                            onclick="workoutDesigner.addInterval('cooldown')"
+                                        >
+                                            <i data-lucide="sunset"></i><strong>Cooldown</strong><small>40% FTP</small>
+                                        </button>
+                                    </div>
+                                    <div id="workoutTimeline" aria-label="Workout intervals"></div>
+                                    <p class="help-text">
+                                        Select an interval to edit. Drag to reorder on desktop. Workouts are locked
+                                        while riding.
+                                    </p>
+                                    <div class="workout-stats">
+                                        <div><span>Duration</span><strong id="totalDuration">0:00</strong></div>
+                                        <div>
+                                            <span>Average power</span
+                                            ><strong><span id="avgPower">0</span><small> W</small></strong>
+                                        </div>
+                                        <div>
+                                            <span>Total work</span
+                                            ><strong><span id="totalWork">0</span><small> kJ</small></strong>
+                                        </div>
+                                    </div>
+                                </section>
+                            </article>
+                        </div>
+                        <aside class="builder-controls">
+                            <article class="card">
+                                <header class="panel-heading"><h2>Keep it for next time</h2></header>
+                                <section class="stack">
+                                    <button class="btn full-width" onclick="app.saveWorkout()">
+                                        <i data-lucide="save"></i> Save workout
+                                    </button>
+                                    <p id="saveWorkoutStatus" class="help-text accent" role="status"></p>
+                                    <div class="divider"></div>
+                                    <span class="eyebrow">IMPORT & EXPORT</span>
+                                    <div class="two-columns">
+                                        <button class="btn-outline" onclick="app.importWorkout()">
+                                            <i data-lucide="upload"></i> JSON</button
+                                        ><button class="btn-outline" onclick="app.exportWorkout()">
+                                            <i data-lucide="download"></i> JSON</button
+                                        ><button class="btn-outline" onclick="app.importZwo()">
+                                            <i data-lucide="upload"></i> ZWO</button
+                                        ><button class="btn-outline" onclick="app.exportZwo()">
+                                            <i data-lucide="download"></i> ZWO
+                                        </button>
+                                    </div>
+                                    <p class="help-text">
+                                        Relative intervals scale to your FTP. Absolute intervals stay at fixed watts.
+                                        Ramps change gradually.
+                                    </p>
+                                </section>
+                            </article>
+                            <details class="card prompt-help">
+                                <summary>Generate a workout with AI <i data-lucide="chevron-down"></i></summary>
+                                <section>
+                                    <p>
+                                        Copy this template into your preferred assistant, describe your goals, then
+                                        import its JSON response.
+                                    </p>
+                                    <pre id="aiPromptText" tabindex="0" aria-label="Workout generation prompt">
+Create a cycling workout for [goal], lasting [minutes], for [experience level]. Include warmup, recoveries, and cooldown. Return valid JSON only, with this structure:
+{"name":"My workout","ftp":200,"intervals":[{"name":"Warmup","type":"warmup","duration":300,"powerType":"relative","percentage":50}]}
+Duration is in seconds. Use powerType "relative" with percentage, "absolute" with power in watts, or "ramp" with percentageLow and percentageHigh. Interval types: warmup, endurance, tempo, threshold, vo2max, cooldown.</pre>
+                                    <button
+                                        class="btn-outline full-width"
+                                        onclick="
+                                            navigator.clipboard
+                                                .writeText(document.getElementById('aiPromptText').textContent)
+                                                .then(() => app.log('Workout prompt copied', 'success'))
+                                                .catch(() =>
+                                                    app.log(
+                                                        'Clipboard unavailable; select and copy the prompt',
+                                                        'warning',
+                                                    ),
+                                                )
+                                        "
+                                    >
+                                        <i data-lucide="copy"></i> Copy prompt
+                                    </button>
+                                </section>
+                            </details>
+                        </aside>
+                    </div>
+                </section>
+
+                <section class="tab-content" id="content-session" aria-labelledby="session-heading">
+                    <div class="page-heading">
+                        <div>
+                            <div class="eyebrow">BETTER IN GOOD COMPANY</div>
+                            <h1 id="session-heading">Different bikes. Same ride<span class="accent">.</span></h1>
+                            <p>Share a workout, not an FTP. Everyone rides at their own level.</p>
+                        </div>
+                    </div>
+                    <div id="sessionNotConnected" class="session-intro">
+                        <article class="card">
+                            <header class="panel-heading"><h2>Pull up a bike</h2></header>
+                            <section>
+                                <form
+                                    class="stack"
+                                    onsubmit="
+                                        app.quickJoinSession();
+                                        return false;
+                                    "
+                                >
+                                    <label for="quickJoinName">Your rider name</label
+                                    ><input
+                                        class="input"
+                                        type="text"
+                                        id="quickJoinName"
+                                        maxlength="80"
+                                        placeholder="Your name"
+                                        required
+                                    /><button type="button" class="btn full-width" onclick="app.quickCreateSession()">
+                                        <i data-lucide="plus"></i> Create a group ride
+                                    </button>
+                                    <div class="or-divider">or join your friends</div>
+                                    <label for="quickJoinSessionCode">Session code</label
+                                    ><input
+                                        class="input"
+                                        type="text"
+                                        id="quickJoinSessionCode"
+                                        placeholder="Paste the code from your host"
+                                        autocomplete="off"
+                                    /><button type="submit" class="btn-outline full-width">
+                                        <i data-lucide="arrow-right"></i> Join group ride
+                                    </button>
                                 </form>
+                            </section>
+                        </article>
+                        <div class="session-explainer">
+                            <div class="session-art" aria-hidden="true">
+                                <i data-lucide="bike"></i><i data-lucide="bike"></i><i data-lucide="bike"></i>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Metrics -->
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="zap" class="size-4 text-muted-foreground"></i>
-                        <span class="text-sm text-muted-foreground font-medium">Power</span>
-                    </div>
-                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.power"></div>
-                    <div class="text-xs text-muted-foreground uppercase tracking-wide">watts</div>
-                </div>
-                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:shadow-sm"
-                    :style="{ backgroundColor: $store.app.heartRateBackground, borderColor: $store.app.heartRateBorder }">
-                    <div class="flex items-center justify-between gap-2 mb-3">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="heart" class="size-4"
-                                :class="$store.app.heartRateZone > 0 ? '' : 'text-muted-foreground'"
-                                :style="$store.app.heartRateZone > 0 ? { color: $store.app.heartRateColor } : {}"></i>
-                            <span class="text-sm font-medium"
-                                :class="$store.app.heartRateZone > 0 ? '' : 'text-muted-foreground'"
-                                :style="$store.app.heartRateZone > 0 ? { color: $store.app.heartRateColor } : {}">Heart Rate</span>
-                        </div>
-                        <span class="text-[0.65rem] font-semibold uppercase tracking-wide px-2 py-1 rounded-full text-white"
-                            x-show="$store.app.heartRateZone > 0"
-                            style="display: none;"
-                            :style="{ backgroundColor: $store.app.heartRateColor }"
-                            x-text="'Zone ' + $store.app.heartRateZone"></span>
-                    </div>
-                    <div class="text-3xl font-bold mb-1 tabular-nums"
-                        :style="{ color: $store.app.heartRateZone > 0 ? $store.app.heartRateColor : 'inherit' }"
-                        x-text="$store.app.heartRate || '--'"></div>
-                    <div class="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                        <span>bpm</span>
-                        <span class="text-[0.65rem] font-medium capitalize text-muted-foreground"
-                            x-show="$store.app.heartRateZoneName"
-                            x-text="$store.app.heartRateZoneName"></span>
-                    </div>
-                </div>
-                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="gauge" class="size-4 text-muted-foreground"></i>
-                        <span class="text-sm text-muted-foreground font-medium">Cadence</span>
-                    </div>
-                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.cadence"></div>
-                    <div class="text-xs text-muted-foreground uppercase tracking-wide">rpm</div>
-                </div>
-                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="target" class="size-4 text-muted-foreground"></i>
-                        <span class="text-sm text-muted-foreground font-medium">Target</span>
-                    </div>
-                    <div class="text-3xl font-bold text-foreground mb-1 tabular-nums" x-text="$store.app.ui.targetPower"></div>
-                    <div class="text-xs text-muted-foreground uppercase tracking-wide">watts</div>
-                </div>
-                <div class="bg-card border border-border rounded-lg p-5 transition-all hover:border-border/80 hover:shadow-sm">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="activity" class="size-4 text-muted-foreground"></i>
-                        <span class="text-sm text-muted-foreground font-medium">Status</span>
-                    </div>
-                    <div class="text-2xl font-bold text-foreground mb-1" x-text="$store.app.connectionStatus"></div>
-                    <div class="text-xs text-muted-foreground uppercase tracking-wide">connection</div>
-                </div>
-            </div>
-
-            <!-- Live Participants Strip -->
-            <div class="card participants-strip" x-show="$store.app.session.active && $store.app.session.participants.length" style="display: none;">
-                <div class="participants-strip-header">
-                    <div class="participants-strip-title">
-                        <i data-lucide="users" class="size-4"></i>
-                        <span>Riders Live</span>
-                        <span class="participants-strip-count" x-text="$store.app.session.participants.length"></span>
-                    </div>
-                    <span class="participants-strip-status" x-text="$store.app.session.isHost ? 'You are the host' : 'Following host cues'"></span>
-                </div>
-                <div class="participants-strip-list" id="participantsStrip">
-                    <template x-for="participant in $store.app.session.participants" :key="participant.id">
-                        <div class="participant-pill" :class="{ 'participant-pill-host': participant.isHost, 'participant-pill-self': participant.isSelf }"
-                            :style="{ backgroundColor: participant.hrBackground, borderColor: participant.hrBorder }">
-                            <div class="participant-pill-header">
-                                <span class="participant-pill-name" x-text="participant.name"></span>
-                                <span class="participant-pill-zone" x-show="participant.zoneLabel" style="display: none;"
-                                    :style="{ backgroundColor: participant.hrColor }"
-                                    x-text="participant.zoneLabel"></span>
-                            </div>
-                            <div class="participant-pill-metrics">
-                                <span><i data-lucide="zap" class="size-3"></i><span x-text="participant.power"></span><small>W</small></span>
-                                <span><i data-lucide="gauge" class="size-3"></i><span x-text="participant.cadence"></span><small>rpm</small></span>
-                                <span><i data-lucide="heart" class="size-3"></i><span x-text="participant.heartRate || '--'"></span><small>bpm</small></span>
-                            </div>
-                            <div class="participant-pill-meta">
-                                <span class="participant-pill-ftp" x-text="participant.ftp + 'W FTP'"></span>
-                                <span class="participant-pill-role host" x-show="participant.isHost" style="display: none;">Host</span>
-                                <span class="participant-pill-role you" x-show="participant.isSelf" style="display: none;">You</span>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Chart -->
-            <div class="card">
-                <header class="border-b border-border">
-                    <h2 class="flex items-center gap-2 text-base font-semibold">
-                        <i data-lucide="line-chart" class="size-4 text-muted-foreground"></i>
-                        <span>Live Data</span>
-                    </h2>
-                </header>
-                <section>
-                    <canvas id="liveChart" width="800" height="300" class="w-full h-[300px]"></canvas>
-                </section>
-            </div>
-
-            <!-- Active Workout -->
-            <div class="card" id="activeWorkoutCard" style="display: none;">
-                <header class="border-b border-border">
-                    <div class="flex items-center justify-between">
-                        <h2 class="flex items-center gap-2 text-base font-semibold">
-                            <i data-lucide="play-circle" class="size-4 text-muted-foreground"></i>
-                            <span id="activeWorkoutName">Active Workout</span>
-                        </h2>
-                        <div id="workoutProgressTime" class="text-sm font-semibold text-muted-foreground tabular-nums">0:00 / 0:00</div>
-                    </div>
-                </header>
-                <section class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="p-4 bg-muted border border-border rounded-md border-l-4 border-l-primary">
-                            <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Current</div>
-                            <div id="currentIntervalName" class="text-base font-bold text-foreground mb-1">--</div>
-                            <div id="currentIntervalTarget" class="text-sm text-muted-foreground tabular-nums">--</div>
-                            <!-- Countdown to next interval -->
-                            <div id="currentIntervalCountdown" class="text-xs text-primary font-bold mt-2 tabular-nums" style="display: none;">
-                                Next in: <span id="countdownSeconds">--</span>
-                            </div>
-                        </div>
-                        <div class="p-4 bg-muted border border-border rounded-md border-l-4 border-l-muted-foreground">
-                            <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Next</div>
-                            <div id="nextIntervalName" class="text-base font-bold text-foreground mb-1">--</div>
-                            <div id="nextIntervalTarget" class="text-sm text-muted-foreground tabular-nums">--</div>
-                        </div>
-                    </div>
-                    <canvas id="workoutProgressChart" width="800" height="120" class="w-full h-[120px]"></canvas>
-
-                    <!-- Session Participants (if in session) - Always show if in session -->
-                    <div class="border-t border-border pt-4" x-show="$store.app.session.active && $store.app.session.participants.length" style="display: none;">
-                        <div class="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                            <i data-lucide="users" class="size-4"></i>
-                            <span>Riding Together</span>
-                        </div>
-                        <div class="space-y-2 max-h-[200px] overflow-y-auto">
-                            <template x-for="participant in $store.app.session.participants" :key="participant.id">
-                                <div class="workout-participant-compact" :class="{ 'host': participant.isHost }">
-                                    <div class="workout-participant-name">
-                                        <span x-text="participant.name"></span>
-                                        <span class="host-badge-mini" x-show="participant.isHost" style="display: none;">HOST</span>
-                                        <span class="host-badge-mini" x-show="participant.isSelf" style="background:#3b82f6;color:#fff; display: none;">YOU</span>
+                            <h2>Same start line.<br />Your own finish.</h2>
+                            <ol>
+                                <li>
+                                    <span>01</span>
+                                    <div>
+                                        <strong>Invite your crew</strong>
+                                        <p>Create a session and share the code.</p>
                                     </div>
-                                    <div class="workout-participant-stats">
-                                        <span class="stat-compact"><i data-lucide="zap"></i><span x-text="participant.power"></span>W</span>
-                                        <span class="stat-compact"><i data-lucide="gauge"></i><span x-text="participant.cadence"></span>rpm</span>
-                                        <span class="stat-compact"><i data-lucide="heart"></i><span :style="{ color: participant.hrColor }" x-text="participant.heartRate || '--'"></span></span>
-                                        <span class="stat-compact ftp-mini" x-text="participant.ftp + 'W FTP'"></span>
+                                </li>
+                                <li>
+                                    <span>02</span>
+                                    <div>
+                                        <strong>Bring your own effort</strong>
+                                        <p>The host shares a workout. Targets scale to each rider's FTP.</p>
                                     </div>
-                                </div>
-                            </template>
+                                </li>
+                                <li>
+                                    <span>03</span>
+                                    <div>
+                                        <strong>Roll out together</strong>
+                                        <p>A shared countdown keeps everyone on the same clock.</p>
+                                    </div>
+                                </li>
+                            </ol>
                         </div>
                     </div>
-
-                    <div class="flex justify-center mt-4">
-                        <button onclick="workoutDesigner.stopWorkout()" id="stopWorkoutBtn" class="btn-lg-destructive">
-                            <i data-lucide="square"></i>
-                            <span>Stop Workout</span>
-                        </button>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Workout Summary (after completion) -->
-            <div class="card" id="workoutSummaryCard" style="display: none;">
-                <header class="border-b border-border">
-                    <h2 class="flex items-center gap-2 text-base font-semibold">
-                        <i data-lucide="check-circle" class="size-4 text-muted-foreground"></i>
-                        <span>Workout Complete!</span>
-                    </h2>
-                </header>
-                <section class="space-y-6">
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <div class="p-4 bg-muted border border-border rounded-md text-center">
-                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Duration</div>
-                            <div id="summaryDuration" class="text-2xl font-bold text-foreground tabular-nums">--</div>
-                        </div>
-                        <div class="p-4 bg-muted border border-border rounded-md text-center">
-                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Avg Power</div>
-                            <div id="summaryAvgPower" class="text-2xl font-bold text-foreground tabular-nums">--</div>
-                        </div>
-                        <div class="p-4 bg-muted border border-border rounded-md text-center">
-                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Max Power</div>
-                            <div id="summaryMaxPower" class="text-2xl font-bold text-foreground tabular-nums">--</div>
-                        </div>
-                        <div class="p-4 bg-muted border border-border rounded-md text-center">
-                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Avg Cadence</div>
-                            <div id="summaryAvgCadence" class="text-2xl font-bold text-foreground tabular-nums">--</div>
-                        </div>
-                        <div class="p-4 bg-muted border border-border rounded-md text-center">
-                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Total Work</div>
-                            <div id="summaryWork" class="text-2xl font-bold text-foreground tabular-nums">--</div>
-                        </div>
-                        <div class="p-4 bg-muted border border-border rounded-md text-center">
-                            <div class="text-xs text-muted-foreground uppercase tracking-wide mb-2">Avg HR</div>
-                            <div id="summaryAvgHR" class="text-2xl font-bold text-foreground tabular-nums">--</div>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
-                        <button onclick="app.downloadWorkoutTCX()" class="btn-lg flex-1">
-                            <i data-lucide="upload"></i>
-                            <span>Download TCX for Strava</span>
-                        </button>
-                        <button onclick="app.downloadWorkoutJSON()" class="btn-ghost">
-                            <i data-lucide="download"></i>
-                            <span>Download JSON</span>
-                        </button>
-                        <button onclick="app.dismissWorkoutSummary()" class="btn-ghost">
-                            <i data-lucide="x"></i>
-                            <span>Close</span>
-                        </button>
-                    </div>
-
-                    <div class="p-4 bg-muted border-l-4 border-l-primary rounded-md space-y-2">
-                        <p class="text-sm text-muted-foreground"><strong class="text-foreground">Upload to Strava:</strong></p>
-                        <ol class="text-sm text-muted-foreground space-y-1 ml-5 list-decimal">
-                            <li>Download the TCX file above</li>
-                            <li>Go to <a href="https://www.strava.com/upload/select" target="_blank" rel="noopener" class="text-primary hover:underline">strava.com/upload/select</a></li>
-                            <li>Upload the TCX file</li>
-                            <li>Add title, description, and publish!</li>
-                        </ol>
-                        <p class="text-sm text-muted-foreground">TCX files also work with Garmin Connect, TrainingPeaks, and most fitness platforms.</p>
-                    </div>
-                </section>
-            </div>
-        </div>
-
-        <!-- Right Sidebar -->
-        <div class="flex flex-col gap-6">
-            <!-- Riders (when in session) -->
-            <div class="card" x-show="$store.app.session.active" style="display: none;">
-                <header>
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="flex items-center gap-2">
-                            <i data-lucide="users"></i>
-                            <span>Session</span>
-                        </h2>
-                        <span class="badge badge-success">
-                            <i data-lucide="wifi" class="w-3 h-3"></i>
-                            Connected
-                        </span>
-                    </div>
-                    <div class="grid gap-2">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-muted-foreground">Code:</span>
-                            <div class="flex items-center gap-2">
-                                <code class="bg-muted px-2 py-1 rounded text-xs" x-text="$store.app.session.sessionId || '---'">---</code>
-                                <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy session code">
-                                    <i data-lucide="copy" class="w-3 h-3"></i>
+                    <div id="sessionConnected" style="display: none">
+                        <div class="session-banner">
+                            <div>
+                                <span class="eyebrow">SHARE YOUR SESSION CODE</span
+                                ><code id="sessionCodeDisplay">—</code>
+                            </div>
+                            <div class="button-row">
+                                <button class="btn-outline" onclick="app.copySessionInfo()">
+                                    <i data-lucide="copy"></i> Copy invite</button
+                                ><button class="btn-destructive" onclick="app.disconnectSession()">
+                                    <i data-lucide="log-out"></i> Leave
                                 </button>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-muted-foreground">Riders:</span>
-                            <span class="font-medium" x-text="$store.app.riderCount">0</span>
+                        <div class="session-grid">
+                            <article class="card">
+                                <header class="panel-heading">
+                                    <h2><i data-lucide="flag"></i> The group ride</h2>
+                                    <span class="count-badge" x-text="$store.app.riderCount + ' riders'"></span>
+                                </header>
+                                <section>
+                                    <canvas
+                                        id="raceTrackCanvas"
+                                        width="1000"
+                                        height="260"
+                                        aria-label="Rider progress along the shared workout"
+                                        role="img"
+                                    ></canvas>
+                                    <div class="session-riders">
+                                        <template
+                                            x-for="participant in $store.app.session.participants"
+                                            :key="participant.id"
+                                            ><div class="participant-card">
+                                                <div class="participant-info">
+                                                    <div class="participant-name">
+                                                        <strong x-text="participant.name"></strong
+                                                        ><span
+                                                            class="tiny-label"
+                                                            x-text="participant.isSelf ? 'YOU' : participant.isHost ? 'HOST' : ''"
+                                                        ></span>
+                                                    </div>
+                                                    <div class="participant-metrics">
+                                                        <span><b x-text="participant.power"></b> W</span
+                                                        ><span><b x-text="participant.cadence"></b> rpm</span
+                                                        ><span class="heart"
+                                                            ><b x-text="participant.heartRate || '—'"></b> bpm</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                                <div class="progress-bar">
+                                                    <div
+                                                        class="progress-fill"
+                                                        :style="{width: Math.min(100, Math.max(0, participant.progress * 100)) + '%'}"
+                                                    ></div>
+                                                </div></div
+                                        ></template>
+                                    </div>
+                                </section>
+                            </article>
+                            <div class="stack">
+                                <article class="card">
+                                    <header class="panel-heading"><h2>Your setup</h2></header>
+                                    <section class="stack">
+                                        <label for="sessionFtpInput">Your FTP (watts)</label
+                                        ><input
+                                            class="input"
+                                            id="sessionFtpInput"
+                                            type="number"
+                                            min="50"
+                                            max="500"
+                                            value="200"
+                                            onchange="app.updateSessionFTP()"
+                                        />
+                                        <p class="help-text">All relative targets use your FTP, not the host's.</p>
+                                        <button class="btn-outline full-width" onclick="app.switchTab('ride')">
+                                            <i data-lucide="bike"></i> Back to ride</button
+                                        ><button
+                                            class="btn-destructive full-width"
+                                            x-show="$store.app.session.isHost"
+                                            onclick="app.endSyncedWorkout()"
+                                        >
+                                            <i data-lucide="square"></i> End workout for everyone
+                                        </button>
+                                    </section>
+                                </article>
+                                <article class="card">
+                                    <header class="panel-heading">
+                                        <h2><i data-lucide="video"></i> Bring the conversation</h2>
+                                    </header>
+                                    <section class="stack">
+                                        <label for="meetLinkInput">Google Meet link</label
+                                        ><input
+                                            class="input"
+                                            id="meetLinkInput"
+                                            type="url"
+                                            placeholder="https://meet.google.com/…"
+                                        /><button class="btn-outline full-width" onclick="app.openMeetLink()">
+                                            Open video chat <i data-lucide="arrow-up-right"></i>
+                                        </button>
+                                    </section>
+                                </article>
+                            </div>
                         </div>
                     </div>
-                </header>
-                <section class="px-0">
-                    <div class="riders-list">
-                        <template x-if="!$store.app.session.participants.length">
-                            <div style="color: var(--text-muted); text-align: center; padding: 1rem;">No riders</div>
-                        </template>
-                        <template x-for="participant in $store.app.session.participants" :key="participant.id">
-                            <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <div style="font-weight: 500;">
-                                        <span x-text="participant.name"></span>
-                                        <span class="badge-secondary" x-show="participant.isHost" style="font-size: 0.7rem; margin-left: 0.25rem; display: none;">HOST</span>
-                                        <span class="badge-secondary" x-show="participant.isSelf" style="font-size: 0.7rem; margin-left: 0.25rem; background:#3b82f6; color:#fff; display: none;">YOU</span>
-                                    </div>
-                                    <span style="font-size: 0.75rem; color: var(--muted-foreground);" x-text="participant.ftp + 'W'"></span>
-                                </div>
-                                <div style="display: flex; gap: 0.75rem; font-size: 0.875rem; color: var(--muted-foreground);">
-                                    <span><i data-lucide="zap" style="width: 14px; height: 14px;"></i> <span x-text="participant.power"></span>W</span>
-                                    <span><i data-lucide="gauge" style="width: 14px; height: 14px;"></i> <span x-text="participant.cadence"></span></span>
-                                    <span><i data-lucide="heart" style="width: 14px; height: 14px;"></i> <span :style="{ color: participant.hrColor }" x-text="participant.heartRate || '--'"></span></span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
                 </section>
-                <footer>
-                    <button onclick="app.disconnectSession()" class="btn-destructive w-full">
-                        <i data-lucide="log-out"></i>
-                        <span>Leave Session</span>
-                    </button>
+                <footer class="app-footer">
+                    <span>Built for the ride. Not the subscription.</span
+                    ><a href="https://github.com/wolfv/cycling-workout/issues" target="_blank" rel="noopener noreferrer"
+                        >Feedback <i data-lucide="arrow-up-right"></i
+                    ></a>
                 </footer>
-            </div>
-
-            <!-- Quick Control -->
-            <div class="card">
-                <header class="border-b border-border">
-                    <h2 class="flex items-center gap-2 text-base font-semibold">
-                        <i data-lucide="sliders" class="size-4 text-muted-foreground"></i>
-                        <span>Quick Control</span>
-                    </h2>
-                </header>
-                <section class="">
-                    <div class="space-y-4">
-                        <div class="space-y-2">
-                            <label for="powerSlider" id="quickControlLabel" class="text-sm font-medium">Target Power</label>
-                            <div id="powerDisplay" class="text-3xl font-bold text-center py-4 bg-muted border border-border rounded-md tabular-nums">100W</div>
-                            <input type="range" id="powerSlider" min="0" max="500" value="100" oninput="app.handleQuickControlInput()" onchange="app.handleQuickControlCommit()" class="input w-full">
-                        </div>
-                        <button onclick="app.handleQuickControlAction()" id="setPowerBtn" disabled class="btn w-full">
-                            <i data-lucide="send"></i>
-                            <span>Set Power</span>
-                        </button>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Workout Control -->
-            <div class="card" id="workoutControlCard" style="display: none;">
-                <header class="border-b border-border">
-                    <h2 class="flex items-center gap-2 text-base font-semibold">
-                        <i data-lucide="play-circle" class="size-4 text-muted-foreground"></i>
-                        <span>Workout Ready</span>
-                    </h2>
-                </header>
-                <section>
-                    <div id="workoutReadyInfo" class="mb-4 text-sm text-muted-foreground">
-                        <!-- Workout info will be shown here -->
-                    </div>
-                    <button onclick="workoutDesigner.startWorkout()" id="startWorkoutBtn" class="btn-lg w-full">
-                        <i data-lucide="play"></i>
-                        <span>Start Workout</span>
-                    </button>
-                    <!-- Host Control for sessions -->
-                    <button onclick="app.startSyncedWorkout()" id="startSyncedBtnSidebar" class="btn-lg w-full mt-2" style="display: none;">
-                        <i data-lucide="users"></i>
-                        <span>Start for Everyone</span>
-                    </button>
-                </section>
-            </div>
-
-            <!-- Activity Log -->
-            <details class="card activity-log-card" open>
-                <summary class="activity-log-header" aria-label="Toggle activity log">
-                    <div class="activity-log-title">
-                        <div class="activity-log-icon">
-                            <i data-lucide="terminal" class="size-4"></i>
-                        </div>
-                        <div class="activity-log-text">
-                            <span class="activity-log-heading">Activity Log</span>
-                            <span class="activity-log-subheading">Live events and connection updates</span>
-                        </div>
-                    </div>
-                    <div class="activity-log-actions">
-                        <span class="badge badge-success activity-log-live">
-                            <span class="activity-log-live-dot"></span>
-                            Live
-                        </span>
-                        <i data-lucide="chevron-down" class="chevron-rotate size-5"></i>
-                    </div>
-                </summary>
-                <section class="activity-log-body">
-                    <div id="log" class="activity-log-stream"></div>
-                </section>
-            </details>
+            </main>
         </div>
-    </div>
-    </div>
 
-    <!-- Design Tab -->
-    <div class="tab-content" id="content-design">
-        <div class="max-w-[1600px] mx-auto p-6">
-            <div class="flex items-center justify-between mb-6">
-                <h1 class="text-2xl font-bold text-foreground">Workout Designer</h1>
-                <div class="flex items-center gap-2 bg-muted border border-border rounded-md px-3 py-2">
-                    <label for="ftpInput" class="text-sm text-muted-foreground font-medium">FTP:</label>
-                    <input type="number" id="ftpInput" value="200" min="50" max="500" onchange="app.updateFTP()" class="w-16 bg-transparent border-none text-sm font-semibold text-foreground text-center focus:outline-none focus:ring-2 focus:ring-ring rounded">
-                    <span class="text-xs text-muted-foreground">W</span>
+        <dialog id="devicesDialog" class="app-dialog" aria-labelledby="devices-title">
+            <div class="dialog-heading">
+                <div>
+                    <div class="eyebrow">YOUR CONNECTIONS</div>
+                    <h2 id="devices-title">Ready when you are.</h2>
                 </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
-                <div class="space-y-6">
-                    <div class="card">
-                        <header class="border-b border-border">
-                            <h2 class="flex items-center gap-2 text-base font-semibold">
-                                <i data-lucide="layout" class="size-4 text-muted-foreground"></i>
-                                <span>Build Your Workout</span>
-                            </h2>
-                        </header>
-                        <section class="space-y-4">
-                            <div class="flex flex-wrap gap-2">
-                                <button onclick="workoutDesigner.addInterval('warmup')" class="btn-sm">
-                                    <i data-lucide="sunrise"></i>
-                                    <span>Warmup</span>
-                                </button>
-                                <button onclick="workoutDesigner.addInterval('endurance')" class="btn-sm">
-                                    <i data-lucide="gauge"></i>
-                                    <span>Endurance</span>
-                                </button>
-                                <button onclick="workoutDesigner.addInterval('tempo')" class="btn-sm">
-                                    <i data-lucide="trending-up"></i>
-                                    <span>Tempo</span>
-                                </button>
-                                <button onclick="workoutDesigner.addInterval('threshold')" class="btn-sm">
-                                    <i data-lucide="flame"></i>
-                                    <span>Threshold</span>
-                                </button>
-                                <button onclick="workoutDesigner.addInterval('vo2max')" class="btn-sm">
-                                    <i data-lucide="rocket"></i>
-                                    <span>VO2 Max</span>
-                                </button>
-                                <button onclick="workoutDesigner.addInterval('cooldown')" class="btn-sm">
-                                    <i data-lucide="sunset"></i>
-                                    <span>Cooldown</span>
-                                </button>
-                                <div class="flex-1"></div>
-                                <button onclick="workoutDesigner.clearWorkout()" class="btn-sm-ghost">
-                                    <i data-lucide="trash-2"></i>
-                                    <span>Clear</span>
-                                </button>
-                            </div>
-                            <div id="workoutTimeline" class="bg-muted border border-border rounded-md p-6 min-h-[180px]"></div>
-                            <div class="flex items-center gap-6 p-4 bg-muted border border-border rounded-md">
-                                <div class="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                                    <i data-lucide="clock" class="size-4"></i>
-                                    <span id="totalDuration" class="tabular-nums">0:00</span>
-                                </div>
-                                <div class="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                                    <i data-lucide="gauge" class="size-4"></i>
-                                    <span id="avgPower" class="tabular-nums">0</span>W avg
-                                </div>
-                                <div class="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                                    <i data-lucide="flame" class="size-4"></i>
-                                    <span id="totalWork" class="tabular-nums">0</span>kJ
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="card">
-                        <header class="border-b border-border">
-                            <h2 class="flex items-center gap-2 text-base font-semibold">
-                                <i data-lucide="save" class="size-4 text-muted-foreground"></i>
-                                <span>Manage</span>
-                            </h2>
-                        </header>
-                        <section class="space-y-2">
-                            <button onclick="app.saveWorkout()" class="btn w-full">
-                                <i data-lucide="save"></i>
-                                <span>Save Workout</span>
-                            </button>
-                            <div class="pt-2 border-t border-border">
-                                <div class="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-2">Import / Export</div>
-                                <div class="space-y-2">
-                                    <button onclick="app.exportWorkout()" class="btn-outline w-full text-sm">
-                                        <i data-lucide="download"></i>
-                                        <span>Export JSON</span>
-                                    </button>
-                                    <button onclick="app.importWorkout()" class="btn-outline w-full text-sm">
-                                        <i data-lucide="upload"></i>
-                                        <span>Import JSON</span>
-                                    </button>
-                                    <button onclick="app.exportZwo()" class="btn-outline w-full text-sm">
-                                        <i data-lucide="download"></i>
-                                        <span>Export ZWO</span>
-                                    </button>
-                                    <button onclick="app.importZwo()" class="btn-outline w-full text-sm">
-                                        <i data-lucide="upload"></i>
-                                        <span>Import ZWO</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <button onclick="app.loadWorkoutForRide()" class="btn-outline w-full">
-                                <i data-lucide="play"></i>
-                                <span>Load & Ride</span>
-                            </button>
-                        </section>
-                    </div>
-
-                    <!-- AI Generation Help -->
-                    <div class="card" x-data="{ expanded: false }">
-                        <header class="border-b border-border cursor-pointer" @click="expanded = !expanded">
-                            <h2 class="flex items-center justify-between text-base font-semibold">
-                                <div class="flex items-center gap-2">
-                                    <i data-lucide="sparkles" class="size-4 text-muted-foreground"></i>
-                                    <span>AI Workout Generator</span>
-                                </div>
-                                <i data-lucide="chevron-down" class="size-4 text-muted-foreground transition-transform" :class="{ 'rotate-180': expanded }"></i>
-                            </h2>
-                        </header>
-                        <section class="space-y-3" x-show="expanded" x-collapse>
-                            <div class="text-sm text-muted-foreground">
-                                <p class="mb-3">Use ChatGPT or Claude to generate custom workouts! Copy the prompt below:</p>
-
-                                <div class="relative">
-                                    <pre class="bg-background border border-border rounded-md p-3 text-xs overflow-x-auto max-h-[300px] overflow-y-auto" id="aiPromptText">I need a cycling workout in JSON format for the Zwift Hub Controller app.
-
-Please create a workout with the following requirements:
-- Workout goal: [e.g., "Sweet spot endurance", "VO2 max intervals", "FTP test"]
-- Duration: [e.g., "60 minutes", "90 minutes"]
-- Difficulty level: [e.g., "beginner", "intermediate", "advanced"]
-- Special requirements: [any specific needs]
-
-The JSON format should follow this structure:
-
-{
-  "name": "Workout Name",
-  "description": "Brief description of the workout",
-  "ftp": 200,
-  "intervals": [
-    {
-      "name": "Interval Name",
-      "type": "warmup|endurance|tempo|threshold|vo2max|cooldown",
-      "duration": 300,
-      "powerType": "relative|absolute|ramp",
-      "percentage": 60  // for relative power
-      // OR
-      "power": 150  // for absolute power in watts
-      // OR for ramps:
-      "percentageLow": 50,
-      "percentageHigh": 80
-    }
-  ],
-  "created": "2025-01-15T12:00:00.000Z",
-  "version": "1.0"
-}
-
-Power type rules:
-- relative (% of FTP): Use for most intervals. Percentage between 10-200.
-- absolute (fixed watts): Use for specific power targets or ramp tests.
-- ramp (gradual increase): Use percentageLow and percentageHigh for smooth power transitions.
-
-Interval types and typical power zones:
-- warmup: 40-60% FTP
-- endurance: 55-75% FTP
-- tempo: 76-87% FTP
-- threshold: 88-105% FTP
-- vo2max: 106-120% FTP
-- cooldown: 40-50% FTP
-
-Please ensure:
-1. Workout starts with a proper warmup (10-15 minutes)
-2. Include recovery periods between hard efforts
-3. End with an adequate cooldown (10 minutes)
-4. Total duration matches my request
-5. Progression is logical and safe
-
-Return only the valid JSON, no additional explanation.</pre>
-                                    <button onclick="navigator.clipboard.writeText(document.getElementById('aiPromptText').textContent)"
-                                            class="absolute top-2 right-2 px-2 py-1 bg-muted hover:bg-accent border border-border rounded text-xs font-medium transition-colors">
-                                        <i data-lucide="copy" class="size-3 inline"></i>
-                                        Copy
-                                    </button>
-                                </div>
-
-                                <div class="mt-3 p-3 bg-muted border border-border rounded-md text-xs">
-                                    <div class="font-semibold mb-1 flex items-center gap-1">
-                                        <i data-lucide="info" class="size-3"></i>
-                                        How to use:
-                                    </div>
-                                    <ol class="list-decimal list-inside space-y-1 ml-1">
-                                        <li>Copy the prompt above</li>
-                                        <li>Paste into ChatGPT or Claude</li>
-                                        <li>Fill in your workout requirements</li>
-                                        <li>Copy the generated JSON</li>
-                                        <li>Use "Import JSON" button to load it</li>
-                                    </ol>
-                                </div>
-
-                                <div class="flex flex-col gap-2 mt-3">
-                                    <a href="WORKOUT-GENERATION-PROMPT.md" target="_blank" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                                        <i data-lucide="file-text" class="size-3"></i>
-                                        View full prompt guide
-                                        <i data-lucide="external-link" class="size-3"></i>
-                                    </a>
-                                    <a href="https://www.zwiftworkout.com/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                                        <i data-lucide="edit-3" class="size-3"></i>
-                                        Create workout with Zwift Workout Editor
-                                        <i data-lucide="external-link" class="size-3"></i>
-                                    </a>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Workouts Tab -->
-    <div class="tab-content" id="content-workouts">
-        <div class="max-w-[1600px] mx-auto p-6">
-            <div class="flex items-center justify-between mb-6">
-                <h1 class="text-2xl font-bold text-foreground">Workout Library</h1>
-                <button onclick="app.importWorkout()" class="btn">
-                    <i data-lucide="upload"></i>
-                    <span>Import Workout</span>
+                <button
+                    class="btn-ghost icon-button"
+                    onclick="document.getElementById('devicesDialog').close()"
+                    aria-label="Close devices"
+                >
+                    <i data-lucide="x"></i>
                 </button>
             </div>
-            <div id="workoutLibrary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Workout cards will be generated here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Session Tab -->
-    <div class="tab-content" id="content-session">
-        <div class="max-w-[1400px] mx-auto p-8">
-            <div class="mb-8">
-                <h1 class="text-2xl font-bold text-foreground mb-2">Ride with Friends</h1>
-            </div>
-
-            <!-- Not Connected State -->
-            <div id="sessionNotConnected" class="space-y-6">
-                <div class="text-center p-12 bg-card border border-border rounded-lg mb-6">
-                    <i data-lucide="users" class="w-16 h-16 mx-auto mb-6 text-primary opacity-50"></i>
-                    <h2 class="text-xl font-bold text-foreground mb-2">Train Together, Ride Stronger</h2>
-                    <p class="text-base text-muted-foreground max-w-2xl mx-auto">Create or join a session to ride with friends. See each other's power, cadence, and race on the same workout!</p>
+            <div class="device-row">
+                <span class="device-icon"><i data-lucide="bike"></i></span>
+                <div>
+                    <strong>Smart trainer</strong>
+                    <p x-text="$store.app.connected ? $store.app.deviceName : $store.app.connectionStatus">
+                        Not connected
+                    </p>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="card">
-                        <header class="border-b border-border">
-                            <h2 class="flex items-center gap-2 text-base font-semibold">
-                                <i data-lucide="plus-circle" class="size-4 text-muted-foreground"></i>
-                                <span>Create Session</span>
-                            </h2>
-                        </header>
-                        <section class="space-y-4">
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-muted-foreground">Your Name</label>
-                                <input type="text" id="hostNameInput" placeholder="Enter your name" value="Rider" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                            </div>
-                            <button onclick="app.createSession()" class="btn-lg w-full">
-                                <i data-lucide="play-circle"></i>
-                                <span>Create Session</span>
-                            </button>
-                        </section>
-                    </div>
-
-                    <div class="card">
-                        <header class="border-b border-border">
-                            <h2 class="flex items-center gap-2 text-base font-semibold">
-                                <i data-lucide="user-plus" class="size-4 text-muted-foreground"></i>
-                                <span>Join Session</span>
-                            </h2>
-                        </header>
-                        <section class="space-y-4">
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-muted-foreground">Your Name</label>
-                                <input type="text" id="joinNameInput" placeholder="Enter your name" value="Rider" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-muted-foreground">Session Code</label>
-                                <input type="text" id="sessionCodeInput" placeholder="e.g., swift-mountain-climbing-falcon" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                                <p class="text-xs text-muted-foreground">Paste the full session code from your friend</p>
-                            </div>
-                            <button onclick="app.joinSession()" class="btn-lg w-full">
-                                <i data-lucide="log-in"></i>
-                                <span>Join Session</span>
-                            </button>
-                        </section>
-                    </div>
-                </div>
+                <button
+                    class="btn-outline"
+                    x-show="!$store.app.connected"
+                    :disabled="$store.app.connecting"
+                    onclick="app.connect()"
+                >
+                    Connect</button
+                ><button class="btn-outline" x-show="$store.app.connected" x-cloak onclick="app.disconnect()">
+                    Disconnect
+                </button>
             </div>
+            <div class="device-row">
+                <span class="device-icon heart"><i data-lucide="heart-pulse"></i></span>
+                <div>
+                    <strong>Heart rate</strong>
+                    <p
+                        x-text="$store.app.hrmConnected ? $store.app.hrmDeviceName : $store.app.hasTrainerHR ? 'From your trainer' : 'Optional sensor'"
+                    >
+                        Optional sensor
+                    </p>
+                </div>
+                <button
+                    class="btn-outline"
+                    x-show="!$store.app.hrmConnected"
+                    :disabled="$store.app.hrmConnecting"
+                    onclick="app.connectHRM()"
+                >
+                    Pair</button
+                ><button class="btn-outline" x-show="$store.app.hrmConnected" x-cloak onclick="app.disconnectHRM()">
+                    Disconnect
+                </button>
+            </div>
+            <p class="help-text">
+                Close other apps using your trainer before pairing. Bluetooth connections need HTTPS or localhost and a
+                supported browser.
+            </p>
+            <div class="sensor-detail">
+                <span>Cadence source</span
+                ><strong
+                    x-text="$store.app.cadenceSource ? $store.app.cadenceSource.toUpperCase() : 'Waiting for data'"
+                ></strong>
+            </div>
+        </dialog>
 
-            <!-- Connected State -->
-            <div id="sessionConnected" class="space-y-6" style="display: none;">
-                <div class="flex items-center gap-4 bg-card border border-border rounded-lg">
-                    <div class="flex items-center gap-3 flex-1">
-                        <span class="text-sm text-muted-foreground font-medium">Session Code:</span>
-                        <code id="sessionCodeDisplay" class="px-3 py-1.5 bg-muted text-primary font-mono text-sm rounded-md">---</code>
-                        <button onclick="app.copySessionInfo()" class="btn-sm-icon-outline" title="Copy Session Code">
-                            <i data-lucide="copy"></i>
-                        </button>
+        <dialog id="intervalDialog" class="app-dialog" aria-labelledby="interval-dialog-title">
+            <form id="intervalForm" onsubmit="workoutDesigner.saveIntervalEdit(event)">
+                <div class="dialog-heading">
+                    <div>
+                        <div class="eyebrow">FINE-TUNE YOUR EFFORT</div>
+                        <h2 id="interval-dialog-title">Edit interval</h2>
                     </div>
-                    <button onclick="app.disconnectSession()" class="btn-destructive">
-                        <i data-lucide="log-out"></i>
-                        <span>Leave Session</span>
+                    <button
+                        type="button"
+                        class="btn-ghost icon-button"
+                        onclick="document.getElementById('intervalDialog').close()"
+                        aria-label="Close interval editor"
+                    >
+                        <i data-lucide="x"></i>
                     </button>
                 </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- My FTP Settings -->
-                    <div class="card">
-                        <header class="border-b border-border">
-                            <h2 class="flex items-center gap-2 text-base font-semibold">
-                                <i data-lucide="gauge" class="size-4 text-muted-foreground"></i>
-                                <span>My FTP</span>
-                            </h2>
-                        </header>
-                        <section class="space-y-4">
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-muted-foreground">Your FTP (Watts)</label>
-                                <input type="number" id="sessionFtpInput" value="200" min="50" max="500" onchange="app.updateSessionFTP()" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                                <p class="text-xs text-muted-foreground">Workout will scale to your FTP. You can adjust this anytime!</p>
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- Video Chat Section -->
-                    <div class="card">
-                        <header class="border-b border-border">
-                            <h2 class="flex items-center gap-2 text-base font-semibold">
-                                <i data-lucide="video" class="size-4 text-muted-foreground"></i>
-                                <span>Video Chat</span>
-                            </h2>
-                        </header>
-                        <section class="space-y-4">
-                            <p class="text-sm text-muted-foreground">Connect with your friends via Google Meet:</p>
-                            <div class="space-y-2">
-                                <input type="text" id="meetLinkInput" placeholder="Paste Google Meet link" class="w-full p-3 bg-muted border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                                <button onclick="app.openMeetLink()" class="btn w-full">
-                                    <i data-lucide="external-link"></i>
-                                    <span>Open Google Meet</span>
-                                </button>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-
-                <!-- Race Track -->
-                <div class="card">
-                    <header class="border-b border-border">
-                        <h2 class="flex items-center gap-2 text-base font-semibold">
-                            <i data-lucide="flag" class="size-4 text-muted-foreground"></i>
-                            <span>Race Track</span>
-                        </h2>
-                    </header>
-                    <section class="p-6">
-                        <canvas id="raceTrackCanvas" width="1000" height="300" class="w-full h-[300px] bg-muted rounded-md"></canvas>
-                    </section>
-                </div>
-
-                <!-- Participants List -->
-                <div class="card">
-                    <header class="border-b border-border">
-                        <h2 class="flex items-center gap-2 text-base font-semibold">
-                            <i data-lucide="users" class="size-4 text-muted-foreground"></i>
-                            <span>Participants</span>
-                        </h2>
-                    </header>
-                    <section class="p-6">
-                        <div class="space-y-3">
-                            <template x-if="!$store.app.session.participants.length">
-                                <div style="color: var(--text-muted); text-align: center; padding: 2rem;">No participants yet</div>
-                            </template>
-                            <template x-for="participant in $store.app.session.participants" :key="participant.id">
-                                <div class="participant-card" :class="{ 'host': participant.isHost }">
-                                    <div class="participant-info">
-                                        <div class="participant-name">
-                                            <span x-text="participant.name"></span>
-                                            <span class="host-badge" x-show="participant.isHost" style="display: none;">HOST</span>
-                                            <span class="host-badge" x-show="participant.isSelf" style="background:#3b82f6; color:#fff; display: none;">YOU</span>
-                                            <span class="ftp-badge" x-text="participant.ftp + 'W FTP'"></span>
-                                        </div>
-                                        <div class="participant-metrics">
-                                            <span><i data-lucide="zap"></i> <span x-text="participant.power"></span>W</span>
-                                            <span><i data-lucide="gauge"></i> <span x-text="participant.cadence"></span> rpm</span>
-                                            <span><i data-lucide="heart"></i> <span :style="{ color: participant.hrColor }" x-text="participant.heartRate || '--'"></span></span>
-                                        </div>
-                                    </div>
-                                    <div class="participant-progress">
-                                        <div class="progress-bar">
-                                            <div class="progress-fill" :style="{ width: (participant.progress * 100) + '%' }"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
+                <div class="stack">
+                    <label for="intervalName">Name</label
+                    ><input class="input" id="intervalName" maxlength="120" required />
+                    <div class="two-columns">
+                        <div class="stack">
+                            <label for="intervalDuration">Duration (seconds)</label
+                            ><input class="input" id="intervalDuration" type="number" min="1" max="86400" required />
                         </div>
-                    </section>
+                        <div class="stack">
+                            <label for="intervalPowerType">Power type</label
+                            ><select
+                                class="select"
+                                id="intervalPowerType"
+                                onchange="workoutDesigner.updateIntervalEditor()"
+                            >
+                                <option value="relative">% of FTP</option>
+                                <option value="absolute">Fixed watts</option>
+                                <option value="ramp">Ramp (% of FTP)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="two-columns">
+                        <div class="stack">
+                            <label id="intervalPowerLabel" for="intervalPower">Intensity (% FTP)</label
+                            ><input
+                                class="input"
+                                id="intervalPower"
+                                type="number"
+                                min="0"
+                                max="300"
+                                step="any"
+                                required
+                            />
+                        </div>
+                        <div class="stack" id="intervalRampEndField" hidden>
+                            <label for="intervalRampEnd">End intensity (% FTP)</label
+                            ><input class="input" id="intervalRampEnd" type="number" min="0" max="300" step="any" />
+                        </div>
+                    </div>
+                    <p id="intervalEditError" class="form-error" role="alert"></p>
+                    <div class="dialog-actions">
+                        <button
+                            class="btn-outline"
+                            type="button"
+                            onclick="document.getElementById('intervalDialog').close()"
+                        >
+                            Cancel</button
+                        ><button class="btn" type="submit">Save interval <i data-lucide="check"></i></button>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    </main>
-
-    <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
-    <script>
-        // Load local scripts with cache busting
-        (function() {
-            var scripts = [
-                'ftms.js',
-                'chart.js',
-                'workout-preview.js',
-                'workout-progress.js',
-                'workout-recorder.js',
-                'workout-designer.js',
-                'hr-zones.js',
-                'session-p2p.js',
-                'racetrack.js',
-                'zwo-converter.js',
-                'app.js'
-            ];
-            var cacheBuster = window.APP_VERSION ? window.APP_VERSION.cacheBuster : Date.now();
-            scripts.forEach(function(src) {
-                document.write('<script src="' + src + '?v=' + cacheBuster + '"><\/script>');
-            });
-        })();
-    </script>
-    <script>
-        // Initialize Lucide icons
-        lucide.createIcons();
-        // Draw workout previews after DOM is loaded
-        setTimeout(() => WorkoutPreview.refreshAllPreviews(), 100);
-
-        // Initialize range sliders with Basecoat styling
-        (() => {
-            const sliders = document.querySelectorAll('input[type="range"].input');
-            if (!sliders) return;
-
-            const updateSlider = (el) => {
-                const min = parseFloat(el.min || 0);
-                const max = parseFloat(el.max || 100);
-                const value = parseFloat(el.value);
-                const percent = (max === min) ? 0 : ((value - min) / (max - min)) * 100;
-                el.style.setProperty('--slider-value', `${percent}%`);
-            };
-
-            sliders.forEach(slider => {
-                updateSlider(slider);
-                slider.addEventListener('input', (event) => updateSlider(event.target));
-            });
-        })();
-    </script>
-
-    <!-- Version Display -->
-    <div id="versionDisplay" style="position: fixed; bottom: 8px; left: 8px; font-size: 11px; color: var(--muted-foreground); font-family: monospace; opacity: 0.7; z-index: 1000; pointer-events: none;">
-        <span id="gitHash">loading...</span>
-    </div>
-</body>
+            </form>
+        </dialog>
+    </body>
 </html>

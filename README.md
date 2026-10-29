@@ -1,6 +1,6 @@
-# Smart Trainer Controller
+# Cadence — Indoor Cycling
 
-A professional, dark-themed dashboard for controlling smart trainers using the FTMS (Fitness Machine Service) protocol via Web Bluetooth. Supports Zwift Hub, Wahoo KICKR, Tacx NEO, Elite, and many more!
+A browser-based training dashboard for FTMS smart trainers, including Zwift Hub, Wahoo KICKR, Tacx NEO, and Elite. Build workouts, control resistance, and ride with friends without a subscription.
 
 🌐 **[Try it live!](https://wolfv.github.io/cycling-workout/)**
 
@@ -13,7 +13,9 @@ A professional, dark-themed dashboard for controlling smart trainers using the F
 - Real-time chart with power, heart rate, and target power
 - 2-minute rolling window
 - Color-coded metrics
-- Cadence calculated from crank revolution data
+- Correct FTMS half-RPM decoding, with CSC and Cycling Power crank data as fallbacks
+- One active cadence source at a time; stale readings clear after three seconds
+- Large ride metrics, mobile navigation, and keyboard-accessible device and interval dialogs
 
 ### 🎯 FTP-Based Workout Designer
 - **Percentage-based intervals** - all workouts scale with your FTP
@@ -25,7 +27,7 @@ A professional, dark-themed dashboard for controlling smart trainers using the F
   - VO2 Max (120% FTP)
   - Cooldown (40% FTP)
 - **Drag and drop** to reorder intervals
-- **Click to edit** intensity percentage and duration
+- **Select to edit** duration, relative power, absolute watts, and ramp endpoints in a dialog
 - **Visual timeline** with color-coded intervals
 - **Automatic execution** - trainer adjusts power automatically
 
@@ -67,7 +69,7 @@ The app is automatically deployed to GitHub Pages via GitHub Actions.
 5. Start designing and riding!
 
 ### Browser Requirements
-- **Chrome 56+**, **Edge 79+**, or **Opera 43+**
+- Current Chrome, Edge, or Opera on a platform with Web Bluetooth
 - Web Bluetooth API support
 - **HTTPS or localhost** (Web Bluetooth security requirement)
 
@@ -85,6 +87,18 @@ node --test tests/*.test.cjs
 ```
 
 The deployment workflow runs these tests before publishing. Tests use simulated Bluetooth devices, peer connections, clocks, and DOM elements; they do not replace a real trainer and multi-browser ride test.
+
+### Browser checks (optional)
+
+The browser smoke test exercises editing, saving/loading, starting/stopping rides, summaries, dialogs, and layouts from 320 to 1440 pixels. It also runs axe accessibility checks. With the local server running on port 8000:
+
+```sh
+npm install --prefix /tmp/cadence-browser-tools playwright @axe-core/playwright
+/tmp/cadence-browser-tools/node_modules/.bin/playwright install chromium
+NODE_PATH=/tmp/cadence-browser-tools/node_modules node tests/browser-smoke.cjs
+```
+
+Set `APP_URL` for a different server address, or `CHROME_PATH` to use an existing Chrome executable. Browser-test dependencies stay outside the application. Screenshots are written to `/tmp/cadence-*.png`.
 
 **Limits:** Keep the ride tab visible and prevent the computer from sleeping. A suspended browser cannot update trainer resistance until it resumes; the trainer may retain its last target during an outage. WebRTC currently uses STUN only, so some restrictive networks need a TURN relay that is not configured here. Automatic recovery covers the trainer, not a separate heart-rate monitor. Reconnect does not prevent all radio or network failures.
 
@@ -131,7 +145,7 @@ The deployment workflow runs these tests before publishing. Tests use simulated 
    - **VO2 Max** - High intensity intervals
    - **Cooldown** - Easy recovery
 2. Drag intervals to reorder them
-3. Click an interval to edit intensity % and duration
+3. Select an interval to edit its name, duration, and power type. Ramps have separate starting and ending percentages.
 
 ### Running a Workout
 1. Click **Start Workout**
@@ -173,14 +187,14 @@ The deployment workflow runs these tests before publishing. Tests use simulated 
 
 ### Files
 - `index.html` - Main HTML structure
-- `style.css` - Dark theme styling
+- `style.css` - Responsive dashboard, navigation, and dialog styling
 - `ftms.js` - FTMS protocol handler
 - `chart.js` - Real-time canvas chart
 - `workout-designer.js` - Workout builder with FTP scaling
 - `app.js` - Main application logic
 
 ### Browser Requirements
-- Chrome 56+, Edge 79+, or Opera 43+
+- Current Chrome, Edge, or Opera on a platform with Web Bluetooth
 - Web Bluetooth API support
 - HTTPS or localhost
 
@@ -196,4 +210,4 @@ MIT
 
 ## Credits
 
-Built with vanilla JavaScript, Lucide icons, and the Web Bluetooth API.
+Built with vanilla JavaScript, Alpine.js, Basecoat CSS, Lucide icons, and the Web Bluetooth API.

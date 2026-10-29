@@ -59,8 +59,9 @@ jobs:
           });
           EOF
 
-          # Add cache buster to local CSS in HTML files
+          # Version local assets together so cached scripts cannot outlive the interface.
           sed -i "s|href=\"style.css\"|href=\"style.css?v=${GIT_HASH}\"|g" index.html
+          sed -i "s|src=\"\([^\":]*\.js\)\"|src=\"\1?v=${GIT_HASH}\"|g" index.html
 
           echo "Updated version.js and added cache busting with hash: ${GIT_HASH}"
 

@@ -3,6 +3,8 @@ class WorkoutDesigner {
     constructor(ftmsController) {
         this.ftms = ftmsController;
         this.intervals = [];
+        this.name = 'Custom workout';
+        this.description = '';
         this.selectedInterval = null;
         this.draggedInterval = null;
         this.isRunning = false;
@@ -256,7 +258,7 @@ class WorkoutDesigner {
             <div class="interval-controls">
                 <button class="interval-delete" aria-label="Delete interval">×</button>
             </div>
-            <div class="interval-info"></div>
+            <button type="button" class="interval-info interval-edit"></button>
             <div class="interval-power">${power}W</div>
             <div class="interval-percentage">${displayText}</div>
             <div class="interval-duration">${this.formatDuration(interval.duration)}</div>
@@ -266,8 +268,10 @@ class WorkoutDesigner {
         el.querySelector('.interval-info').textContent = interval.name;
         el.querySelector('.interval-delete').addEventListener('click', () => this.removeInterval(interval.id));
 
+        el.querySelector('.interval-edit').setAttribute('aria-label', `Edit ${interval.name}, ${this.formatDuration(interval.duration)}`);
+
         // Make draggable
-        el.draggable = true;
+        el.draggable = !this.isRunning;
         el.addEventListener('dragstart', (e) => this.handleDragStart(e, interval));
         el.addEventListener('dragend', (e) => this.handleDragEnd(e));
         el.addEventListener('dragover', (e) => this.handleDragOver(e));
@@ -312,55 +316,59 @@ class WorkoutDesigner {
 
         // Reorder
         this.intervals.splice(draggedIndex, 1);
-        const newTargetIndex = this.intervals.findIndex(i => i.id === targetInterval.id);
-        this.intervals.splice(newTargetIndex, 0, this.draggedInterval);
+        this.intervals.splice(targetIndex, 0, this.draggedInterval);
 
         this.render();
     }
 
     showEditDialog(interval) {
         if (this.isRunning) return;
-        // Determine current power type
+        this.selectedInterval = interval.id;
         const powerType = interval.powerType || 'relative';
-        
-        // Ask user to choose power type
-        const typeChoice = confirm('Click OK for % of FTP (relative)\nClick Cancel for Absolute Watts');
-        
-        if (typeChoice) {
-            // Relative FTP
-            const newPercentage = prompt(`Set intensity for ${interval.name} (% of FTP):`, interval.percentage || 100);
-            if (newPercentage !== null) {
-                const percentage = parseInt(newPercentage);
-                if (!isNaN(percentage) && percentage >= 10 && percentage <= 200) {
-                    interval.percentage = percentage;
-                    interval.powerType = 'relative';
-                    delete interval.power; // Remove absolute power if switching
-                }
-            }
-        } else {
-            // Absolute Watts
-            const currentPower = interval.power || Math.round(this.ftp * ((interval.percentage || 100) / 100));
-            const newPower = prompt(`Set absolute power for ${interval.name} (Watts):`, currentPower);
-            if (newPower !== null) {
-                const power = parseInt(newPower);
-                if (!isNaN(power) && power >= 10 && power <= 1000) {
-                    interval.power = power;
-                    interval.powerType = 'absolute';
-                    delete interval.percentage; // Remove percentage if switching
-                }
-            }
-        }
+        document.getElementById('intervalName').value = interval.name;
+        document.getElementById('intervalDuration').value = interval.duration;
+        document.getElementById('intervalPowerType').value = powerType;
+        document.getElementById('intervalPower').value = powerType === 'absolute' ? interval.power : powerType === 'ramp' ? interval.percentageLow : interval.percentage;
+        document.getElementById('intervalRampEnd').value = interval.percentageHigh ?? 100;
+        document.getElementById('intervalEditError').textContent = '';
+        this.updateIntervalEditor();
+        document.getElementById('intervalDialog').showModal();
+    }
 
-        const newDuration = prompt(`Set duration for ${interval.name} (seconds):`, interval.duration);
-        if (newDuration !== null) {
-            const duration = parseInt(newDuration);
-            if (!isNaN(duration) && duration >= 10 && duration <= 7200) {
-                interval.duration = duration;
-            }
-        }
+    updateIntervalEditor() {
+        const type = document.getElementById('intervalPowerType').value;
+        document.getElementById('intervalPowerLabel').textContent = type === 'absolute' ? 'Power (watts)' : type === 'ramp' ? 'Start intensity (% FTP)' : 'Intensity (% FTP)';
+        document.getElementById('intervalPower').max = type === 'absolute' ? 2000 : 300;
+        document.getElementById('intervalRampEndField').hidden = type !== 'ramp';
+        document.getElementById('intervalRampEnd').required = type === 'ramp';
+        document.getElementById('intervalRampEnd').disabled = type !== 'ramp';
+    }
 
-        this.render();
-        this.updateWorkoutInfo();
+    saveIntervalEdit(event) {
+        event.preventDefault();
+        if (this.isRunning) return;
+        const index = this.intervals.findIndex(interval => interval.id === this.selectedInterval);
+        if (index < 0) return;
+        const original = this.intervals[index];
+        const powerType = document.getElementById('intervalPowerType').value;
+        const value = Number(document.getElementById('intervalPower').value);
+        try {
+            const [interval] = WorkoutDesigner.normalizeIntervals([{
+                name: document.getElementById('intervalName').value.trim() || 'Interval',
+                type: original.type,
+                duration: Number(document.getElementById('intervalDuration').value),
+                powerType,
+                ...(powerType === 'absolute' ? { power: value } : powerType === 'ramp'
+                    ? { percentageLow: value, percentageHigh: Number(document.getElementById('intervalRampEnd').value) }
+                    : { percentage: value })
+            }]);
+            this.intervals[index] = { ...interval, id: original.id };
+            this.render();
+            this.updateWorkoutInfo();
+            document.getElementById('intervalDialog').close();
+        } catch (error) {
+            document.getElementById('intervalEditError').textContent = error.message;
+        }
     }
 
     formatDuration(seconds) {
@@ -380,6 +388,14 @@ class WorkoutDesigner {
         document.getElementById('totalDuration').textContent = this.formatDuration(totalDuration);
         document.getElementById('avgPower').textContent = avgPower;
         document.getElementById('totalWork').textContent = totalWork.toFixed(1);
+        const readyInfo = document.getElementById('workoutReadyInfo');
+        if (readyInfo) readyInfo.textContent = `${this.formatDuration(totalDuration)} · ${this.intervals.length} intervals · ${avgPower}W average`;
+        if (window.Alpine) {
+            const workout = Alpine.store('app').workout;
+            workout.loaded = this.intervals.length > 0;
+            workout.name = this.name;
+            workout.timeTotal = totalDuration;
+        }
     }
 
     async startWorkout(syncStartTime = null) {
@@ -635,6 +651,8 @@ class WorkoutDesigner {
             if (!name) return;
         }
 
+        this.name = name;
+        this.updateWorkoutInfo();
         const workout = { ...this.exportWorkoutData(), name };
         if (!workout.intervals) return;
 
@@ -666,6 +684,9 @@ class WorkoutDesigner {
             document.getElementById('ftpInput').value = this.ftp;
         }
 
+        this.name = name;
+        this.description = String(workout.description || '');
+        document.getElementById('workoutName').value = name;
         this.render();
         this.updateWorkoutInfo();
         this.ftms.log(`Loaded workout: ${name}`, 'success');
@@ -697,11 +718,7 @@ class WorkoutDesigner {
             return;
         }
 
-        const workout = {
-            ...this.exportWorkoutData(),
-            name: prompt('Workout name:', 'My Workout') || 'Workout',
-            description: prompt('Workout description (optional):', '') || ''
-        };
+        const workout = this.exportWorkoutData();
 
         const dataStr = JSON.stringify(workout, null, 2);
         const dataBlob = new Blob([dataStr], {type: 'application/json'});
@@ -759,8 +776,8 @@ class WorkoutDesigner {
         }
 
         return {
-            name: 'Custom Workout',
-            description: '',
+            name: this.name,
+            description: this.description,
             ftp: this.ftp,
             intervals: this.intervals.map(interval => {
                 const cleanInterval = {
@@ -805,6 +822,9 @@ class WorkoutDesigner {
         }
 
         this.intervals = validIntervals;
+        this.name = String(workout.name || 'Imported workout');
+        this.description = String(workout.description || '');
+        document.getElementById('workoutName').value = this.name;
 
         if (workout.ftp && typeof workout.ftp === 'number') {
             this.ftp = workout.ftp;
@@ -816,7 +836,7 @@ class WorkoutDesigner {
 
         // Auto-save if workout has a name
         if (workout.name) {
-            this.saveWorkout(workout.name);
+            this.saveWorkout(this.name);
 
             if (window.app) {
                 if (typeof window.app.refreshWorkoutLibrary === 'function') {

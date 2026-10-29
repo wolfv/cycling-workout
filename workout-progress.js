@@ -12,12 +12,12 @@ class WorkoutProgressVisualizer {
 
         // Colors matching workout zones
         this.colorMap = {
-            warmup: '#f59e0b',
-            endurance: '#3b82f6',
-            tempo: '#22c55e',
-            threshold: '#ef4444',
-            vo2max: '#a855f7',
-            cooldown: '#6366f1'
+            warmup: '#e7bb71',
+            endurance: '#78b4db',
+            tempo: '#a5cb78',
+            threshold: '#ee9390',
+            vo2max: '#b4a0de',
+            cooldown: '#91bfb9'
         };
 
         this.resize();
@@ -62,7 +62,7 @@ class WorkoutProgressVisualizer {
         const height = this.height;
 
         // Clear canvas
-        ctx.fillStyle = '#18181b';
+        ctx.fillStyle = '#191d19';
         ctx.fillRect(0, 0, width, height);
 
         if (!this.intervals || this.intervals.length === 0) return;
@@ -201,7 +201,7 @@ class WorkoutProgressVisualizer {
         });
 
         // Draw timeline labels at bottom
-        ctx.fillStyle = '#71717a';
+        ctx.fillStyle = '#a2ac9e';
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
 
@@ -235,7 +235,7 @@ class WorkoutProgressVisualizer {
         this.intervals = [];
         this.currentIntervalIndex = -1;
         const ctx = this.ctx;
-        ctx.fillStyle = '#18181b';
+        ctx.fillStyle = '#191d19';
         ctx.fillRect(0, 0, this.width, this.height);
     }
 }
