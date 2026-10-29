@@ -27,6 +27,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run regression tests
+        run: node --test tests/*.test.cjs
+
       - name: Update version.js and add cache busting
         run: |
           GIT_HASH=$(git rev-parse --short HEAD)

@@ -73,16 +73,15 @@ class WorkoutProgressVisualizer {
         const powers = this.intervals.map(i => {
             const powerType = i.powerType || 'relative';
             if (powerType === 'ramp') {
-                // For ramps, use the high value for max calculation
-                return Math.round(this.ftp * this.intensityScale * ((i.percentageHigh || 100) / 100));
+                return Math.round(this.ftp * this.intensityScale * Math.max(i.percentageLow ?? 50, i.percentageHigh ?? 100) / 100);
             } else if (powerType === 'absolute') {
                 return Math.round((i.power || 0) * this.intensityScale);
             } else {
-                return Math.round(this.ftp * this.intensityScale * ((i.percentage || 100) / 100));
+                return Math.round(this.ftp * this.intensityScale * ((i.percentage ?? 100) / 100));
             }
         });
 
-        const maxPower = Math.max(...powers);
+        const maxPower = Math.max(1, ...powers);
 
         let x = 0;
         this.intervals.forEach((interval, index) => {
@@ -109,8 +108,8 @@ class WorkoutProgressVisualizer {
 
             if (powerType === 'ramp') {
                 // Draw ramp as trapezoid
-                const powerLow = Math.round(this.ftp * this.intensityScale * ((interval.percentageLow || 50) / 100));
-                const powerHigh = Math.round(this.ftp * this.intensityScale * ((interval.percentageHigh || 100) / 100));
+                const powerLow = Math.round(this.ftp * this.intensityScale * ((interval.percentageLow ?? 50) / 100));
+                const powerHigh = Math.round(this.ftp * this.intensityScale * ((interval.percentageHigh ?? 100) / 100));
                 const barHeightLow = (powerLow / maxPower) * (height - 30);
                 const barHeightHigh = (powerHigh / maxPower) * (height - 30);
 

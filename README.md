@@ -2,7 +2,7 @@
 
 A professional, dark-themed dashboard for controlling smart trainers using the FTMS (Fitness Machine Service) protocol via Web Bluetooth. Supports Zwift Hub, Wahoo KICKR, Tacx NEO, Elite, and many more!
 
-🌐 **[Try it live!](https://wolfv.github.io/cycling-workout/)** (Replace with your GitHub Pages URL after deployment)
+🌐 **[Try it live!](https://wolfv.github.io/cycling-workout/)**
 
 [![Deploy to GitHub Pages](https://wolfv.github.io/cycling-workout/actions/workflows/deploy.yml/badge.svg)](https://wolfv.github.io/cycling-workout/actions/workflows/deploy.yml)
 
@@ -60,8 +60,8 @@ This app works with **any smart trainer that supports FTMS (Fitness Machine Serv
 The app is automatically deployed to GitHub Pages via GitHub Actions.
 
 ### Option 2: Local Development
-1. Open `index.html` in a modern browser (Chrome, Edge, or Opera)
-2. Ensure you're using HTTPS or localhost (Web Bluetooth requirement)
+1. Run `python3 -m http.server 8000` from this directory.
+2. Open `http://localhost:8000` in Chrome, Edge, or Opera (Web Bluetooth requires HTTPS or localhost).
 3. Click **Connect** to pair with your smart trainer
 4. Set your FTP in the workout designer
 5. Start designing and riding!
@@ -70,6 +70,23 @@ The app is automatically deployed to GitHub Pages via GitHub Actions.
 - **Chrome 56+**, **Edge 79+**, or **Opera 43+**
 - Web Bluetooth API support
 - **HTTPS or localhost** (Web Bluetooth security requirement)
+
+## Reliability and Testing
+
+- Unexpected trainer disconnects trigger up to five reconnect attempts with increasing delays. An active workout keeps its original clock and restores the current interval's target after reconnecting. Without an active workout, reconnecting sets the target to zero.
+- FTMS commands wait for both the Bluetooth write and the trainer's response. Stale queued power targets are discarded; a five-second timeout disconnects and retries the connection.
+- Group starts use a round-trip clock-offset estimate and one shared start timestamp. Late joins and delayed browser timers catch up to the current interval instead of extending the workout.
+- Signaling connections retry up to five times. The host also recreates closed peer connections. Leaving a session cancels retries and pending countdowns.
+
+Run the dependency-free regression suite with Node.js 22 or newer:
+
+```sh
+node --test tests/*.test.cjs
+```
+
+The deployment workflow runs these tests before publishing. Tests use simulated Bluetooth devices, peer connections, clocks, and DOM elements; they do not replace a real trainer and multi-browser ride test.
+
+**Limits:** Keep the ride tab visible and prevent the computer from sleeping. A suspended browser cannot update trainer resistance until it resumes; the trainer may retain its last target during an outage. WebRTC currently uses STUN only, so some restrictive networks need a TURN relay that is not configured here. Automatic recovery covers the trainer, not a separate heart-rate monitor. Reconnect does not prevent all radio or network failures.
 
 ## Deployment
 

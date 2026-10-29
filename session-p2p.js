@@ -20,6 +20,12 @@ class P2PSessionManager {
 
         // Clock sync - offset from host's clock (in ms)
         this.clockOffset = 0;
+        this.clockRequests = new Map();
+        this.pendingStartTime = null;
+        this.startSyncTimer = null;
+        this.reconnectTimer = null;
+        this.reconnectAttempts = 0;
+        this.peerRetryTimers = new Map();
 
         // Cloudflare Worker URL
         this.signalingUrl = 'wss://zwift-signaling.w-vollprecht.workers.dev';
@@ -61,35 +67,57 @@ class P2PSessionManager {
         const wsUrl = `${this.signalingUrl}/signal/${this.sessionId}`;
         console.log('Connecting to signaling server:', wsUrl);
 
-        this.signalingWs = new WebSocket(wsUrl);
+        const ws = new WebSocket(wsUrl);
+        this.signalingWs = ws;
 
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error('Signaling server connection timeout'));
+                ws.close();
             }, 10000);
 
-            this.signalingWs.onopen = () => {
+            ws.onopen = () => {
                 console.log('Connected to signaling server');
-                clearTimeout(timeout);
             };
 
-            this.signalingWs.onerror = (err) => {
+            ws.onerror = (err) => {
                 console.error('Signaling WebSocket error:', err);
                 clearTimeout(timeout);
                 reject(new Error('Failed to connect to signaling server'));
+                ws.close();
             };
 
-            this.signalingWs.onmessage = (event) => {
+            ws.onmessage = (event) => {
+                if (this.signalingWs !== ws) return;
                 try {
                     const data = JSON.parse(event.data);
-                    this.handleSignalingMessage(data, resolve);
+                    this.handleSignalingMessage(data, () => {
+                        clearTimeout(timeout);
+                        this.reconnectAttempts = 0;
+                        resolve();
+                    });
                 } catch (err) {
                     console.error('Error parsing signaling message:', err);
                 }
             };
 
-            this.signalingWs.onclose = () => {
-                console.log('Signaling connection closed');
+            ws.onclose = () => {
+                clearTimeout(timeout);
+                reject(new Error('Signaling connection closed'));
+                if (this.signalingWs !== ws || !this.sessionId) return;
+                this.signalingWs = null;
+                for (const peerId of [...this.peers.keys()]) this.removePeer(peerId);
+                if (!this.reconnectTimer && this.reconnectAttempts < 5) {
+                    this.reconnectTimer = setTimeout(async () => {
+                        this.reconnectTimer = null;
+                        this.reconnectAttempts++;
+                        try {
+                            await this.connectToSignaling();
+                        } catch (error) {
+                            console.warn('Signaling reconnect failed:', error.message);
+                        }
+                    }, Math.min(1000 * 2 ** this.reconnectAttempts, 10000));
+                }
             };
         });
     }
@@ -100,6 +128,7 @@ class P2PSessionManager {
         switch (data.type) {
             case 'id':
                 // Got our peer ID from signaling server
+                this.participants.clear();
                 this.myPeerId = data.id;
                 const serverHostFlag = typeof data.isHost === 'boolean' ? data.isHost : false;
                 if (!this.isHost) {
@@ -146,8 +175,9 @@ class P2PSessionManager {
                             heartRate: 0,
                             progress: 0,
                             ftp: peer.ftp || 200,
-                            isHost: false
+                            isHost: Boolean(peer.isHost)
                         });
+                        if (this.isHost) this.createPeerConnection(peer.id, true);
                     }
                 });
                 this.updateParticipants();
@@ -251,8 +281,12 @@ class P2PSessionManager {
                     try {
                         const info = JSON.parse(workoutInfo);
                         // Only send if workout is still ongoing (within reasonable time)
-                        const elapsed = this.getSyncedTime() - info.startTime;
-                        if (elapsed < 7200000) { // 2 hours max
+                        const elapsed = Date.now() - info.startTime;
+                        const duration = info.workout?.intervals?.reduce((sum, interval) => sum + interval.duration * 1000, 0);
+                        if (info.sessionId === this.sessionId && Number.isFinite(duration) && elapsed < duration) {
+                            if (!this.sharedWorkout) {
+                                this.sendToPeer(peerId, { type: 'workout', workout: info.workout });
+                            }
                             this.sendToPeer(peerId, {
                                 type: 'start-countdown',
                                 startTime: info.startTime
@@ -262,6 +296,8 @@ class P2PSessionManager {
                         console.error('Failed to parse workout start info:', e);
                     }
                 }
+            } else {
+                this.requestClockSync(peerId);
             }
         });
 
@@ -281,7 +317,15 @@ class P2PSessionManager {
 
         peer.on('close', () => {
             console.log('P2P connection closed with', peerId);
-            this.removePeer(peerId);
+            if (this.peers.get(peerId) !== peer) return;
+            this.peers.delete(peerId);
+            if (this.isHost && this.sessionId && this.participants.has(peerId)) {
+                const timer = setTimeout(() => {
+                    this.peerRetryTimers.delete(peerId);
+                    if (this.participants.has(peerId)) this.createPeerConnection(peerId, true);
+                }, 2000);
+                this.peerRetryTimers.set(peerId, timer);
+            }
         });
 
         this.peers.set(peerId, peer);
@@ -301,19 +345,48 @@ class P2PSessionManager {
         }
     }
 
+    requestClockSync(peerId) {
+        const sentAt = Date.now();
+        this.clockRequests.set(peerId, sentAt);
+        this.sendToPeer(peerId, { type: 'clock-request', sentAt });
+    }
+
+    deliverPendingStart() {
+        if (this.pendingStartTime === null) return;
+        clearTimeout(this.startSyncTimer);
+        this.startSyncTimer = null;
+        const startTime = this.pendingStartTime;
+        this.pendingStartTime = null;
+        this.onSessionStart?.(startTime + this.clockOffset);
+    }
+
     handleP2PMessage(fromPeerId, data) {
         // Handle messages received via direct P2P connection
         switch (data.type) {
             case 'clock-sync':
-                // Calculate offset: how much our clock differs from host's
-                // Positive offset = our clock is ahead, negative = behind
-                const localTime = Date.now();
-                this.clockOffset = localTime - data.hostTime;
-                console.log(`Clock sync: host time ${data.hostTime}, local time ${localTime}, offset ${this.clockOffset}ms`);
+                // Compatibility with older hosts; a round-trip sample replaces this estimate.
+                if (!this.isHost && Number.isFinite(data.hostTime)) this.clockOffset = Date.now() - data.hostTime;
                 break;
 
+            case 'clock-request':
+                if (this.isHost && Number.isFinite(data.sentAt)) {
+                    this.sendToPeer(fromPeerId, { type: 'clock-response', sentAt: data.sentAt, hostTime: Date.now() });
+                }
+                break;
+
+            case 'clock-response': {
+                const receivedAt = Date.now();
+                if (this.isHost || !Number.isFinite(data.sentAt) || this.clockRequests.get(fromPeerId) !== data.sentAt || !Number.isFinite(data.hostTime)) break;
+                const roundTrip = receivedAt - data.sentAt;
+                if (roundTrip < 0 || roundTrip > 5000) break;
+                this.clockRequests.delete(fromPeerId);
+                this.clockOffset = (data.sentAt + receivedAt) / 2 - data.hostTime;
+                this.deliverPendingStart();
+                break;
+            }
+
             case 'metrics':
-                const participant = this.participants.get(fromPeerId);
+                const participant = this.participants.get(this.isHost ? fromPeerId : (data.peerId || fromPeerId));
                 if (participant) {
                     participant.power = data.power;
                     participant.cadence = data.cadence;
@@ -324,11 +397,12 @@ class P2PSessionManager {
 
                 // If host, relay to other participants
                 if (this.isHost) {
-                    this.broadcast(data, fromPeerId);
+                    this.broadcast({ ...data, peerId: fromPeerId }, fromPeerId);
                 }
                 break;
 
             case 'workout':
+                if (this.isHost) break;
                 this.sharedWorkout = data.workout;
                 if (this.onWorkoutReceived) {
                     this.onWorkoutReceived(data.workout);
@@ -336,17 +410,16 @@ class P2PSessionManager {
                 break;
 
             case 'start-countdown':
-                if (this.onSessionStart) {
-                    // startTime is in "true" UTC time (synced with time server)
-                    // Convert to local time by adding our clock offset
-                    const localStartTime = data.startTime + this.clockOffset;
-                    console.log(`Workout start: synced time ${data.startTime}, local time ${localStartTime}, offset ${this.clockOffset}ms`);
-                    this.onSessionStart(localStartTime);
-                }
+                if (this.isHost || !Number.isFinite(data.startTime)) break;
+                this.pendingStartTime = data.startTime;
+                clearTimeout(this.startSyncTimer);
+                this.requestClockSync(fromPeerId);
+                // Older clients only support one-way clock sync.
+                this.startSyncTimer = setTimeout(() => this.deliverPendingStart(), 1500);
                 break;
 
             case 'ftp-update':
-                const ftpParticipant = this.participants.get(fromPeerId);
+                const ftpParticipant = this.participants.get(this.isHost ? fromPeerId : (data.peerId || fromPeerId));
                 if (ftpParticipant) {
                     ftpParticipant.ftp = data.ftp;
                     this.updateParticipants();
@@ -354,11 +427,14 @@ class P2PSessionManager {
 
                 // If host, relay to other participants
                 if (this.isHost) {
-                    this.broadcast(data, fromPeerId);
+                    this.broadcast({ ...data, peerId: fromPeerId }, fromPeerId);
                 }
                 break;
 
             case 'end-workout':
+                if (this.isHost) break;
+                clearTimeout(this.startSyncTimer);
+                this.pendingStartTime = null;
                 if (this.onSessionEnd) {
                     this.onSessionEnd();
                 }
@@ -375,7 +451,12 @@ class P2PSessionManager {
     sendToPeer(peerId, message) {
         const peer = this.peers.get(peerId);
         if (peer && peer.connected) {
-            peer.send(JSON.stringify(message));
+            try {
+                peer.send(JSON.stringify(message));
+            } catch (error) {
+                console.warn('Peer send failed:', error.message);
+                peer.destroy();
+            }
         }
     }
 
@@ -383,7 +464,7 @@ class P2PSessionManager {
     broadcast(message, excludePeerId = null) {
         for (const [peerId, peer] of this.peers.entries()) {
             if (peerId !== excludePeerId && peer.connected) {
-                peer.send(JSON.stringify(message));
+                this.sendToPeer(peerId, message);
             }
         }
     }
@@ -425,15 +506,15 @@ class P2PSessionManager {
 
     shareWorkout(workout) {
         this.sharedWorkout = workout;
+        this.saveSessionState();
         this.broadcast({
             type: 'workout',
             workout
         });
     }
 
-    startSynchronizedWorkout(countdownSeconds) {
-        // Host's local time - participants will adjust with their clock offset
-        const startTime = Date.now() + (countdownSeconds * 1000);
+    startSynchronizedWorkout(countdownSeconds, startTime = Date.now() + countdownSeconds * 1000) {
+        // The host and participants must use the exact same timestamp.
         console.log(`Starting workout at: ${startTime} (countdown: ${countdownSeconds}s)`);
         this.broadcast({
             type: 'start-countdown',
@@ -442,6 +523,7 @@ class P2PSessionManager {
     }
 
     endWorkout() {
+        localStorage.removeItem('workout_start_info');
         this.broadcast({
             type: 'end-workout'
         });
@@ -498,10 +580,13 @@ class P2PSessionManager {
     }
 
     removePeer(peerId) {
+        clearTimeout(this.peerRetryTimers.get(peerId));
+        this.peerRetryTimers.delete(peerId);
+        this.clockRequests.delete(peerId);
         const peer = this.peers.get(peerId);
         if (peer) {
-            peer.destroy();
             this.peers.delete(peerId);
+            peer.destroy();
         }
 
         this.participants.delete(peerId);
@@ -511,11 +596,17 @@ class P2PSessionManager {
     disconnect() {
         console.log('Disconnecting from session');
 
-        // Close all P2P connections
-        for (const peer of this.peers.values()) {
-            peer.destroy();
-        }
-        this.peers.clear();
+        this.sessionId = null;
+        clearTimeout(this.reconnectTimer);
+        clearTimeout(this.startSyncTimer);
+        this.reconnectTimer = null;
+        this.reconnectAttempts = 0;
+        this.pendingStartTime = null;
+        this.clockOffset = 0;
+        for (const timer of this.peerRetryTimers.values()) clearTimeout(timer);
+        this.peerRetryTimers.clear();
+        this.clockRequests.clear();
+        for (const peerId of [...this.peers.keys()]) this.removePeer(peerId);
 
         // Close signaling connection
         if (this.signalingWs) {

@@ -8,6 +8,29 @@ class FTMSController {
         this.onMetricsUpdate = null;
         this.onLog = null;
         this.lastDeviceId = null;
+        this.onConnectionChange = null;
+        this.ready = false;
+        this.reconnectTimer = null;
+        this.reconnectAttempts = 0;
+        this.commandQueue = Promise.resolve();
+        this.pendingResponse = null;
+        this.connectionGeneration = 0;
+        this.targetSequence = 0;
+        this.notificationController = null;
+        this.handleTrainerDisconnect = (event) => {
+            if (event.target !== this.device) return;
+            this.connectionGeneration++;
+            this.ready = false;
+            this.notificationController?.abort();
+            this.server = null;
+            this.controlPointChar = null;
+            if (this.pendingResponse) this.pendingResponse.finish(false);
+            this.metrics = { power: 0, hr: 0, cadence: 0, timestamp: Date.now() };
+            this.onMetricsUpdate?.(this.metrics);
+            this.onConnectionChange?.(false);
+            this.log('Trainer disconnected; attempting to reconnect...', 'warning');
+            this.scheduleReconnect();
+        };
 
         // Track which service provides cadence (first one wins to prevent jumping values)
         this.cadenceSource = null;
@@ -27,15 +50,23 @@ class FTMSController {
                 id: this.device.id,
                 name: this.device.name
             };
-            localStorage.setItem('lastBluetoothDevice', JSON.stringify(deviceInfo));
+            try {
+                localStorage.setItem('lastBluetoothDevice', JSON.stringify(deviceInfo));
+            } catch (error) {
+                this.log('Could not save paired device', 'warning');
+            }
             this.log(`Saved device: ${this.device.name}`, 'info');
         }
     }
 
     // Get saved device info
     getLastDevice() {
-        const saved = localStorage.getItem('lastBluetoothDevice');
-        return saved ? JSON.parse(saved) : null;
+        try {
+            const saved = localStorage.getItem('lastBluetoothDevice');
+            return saved ? JSON.parse(saved) : null;
+        } catch (error) {
+            return null;
+        }
     }
 
     // Try to reconnect to last device
@@ -57,23 +88,73 @@ class FTMSController {
                 return false;
             }
 
-            // Check if device is in range by trying to connect
-            if (!savedDevice.gatt.connected) {
-                this.device = savedDevice;
-                this.server = await this.device.gatt.connect();
-                this.log(`Reconnected to ${this.device.name}!`, 'success');
-
-                await this.subscribeToMetrics();
-                await this.initializeFTMS();
-
-                return true;
-            }
-
-            return false;
+            return await this.connectToDevice(savedDevice);
         } catch (error) {
             this.log(`Reconnection failed: ${error.message}`, 'warning');
             return false;
         }
+    }
+
+    async connectToDevice(device) {
+        const generation = ++this.connectionGeneration;
+        this.notificationController?.abort();
+        this.notificationController = new AbortController();
+        this.device = device;
+        this.ready = false;
+        device.removeEventListener('gattserverdisconnected', this.handleTrainerDisconnect);
+        device.addEventListener('gattserverdisconnected', this.handleTrainerDisconnect);
+        try {
+            const server = await device.gatt.connect();
+            if (generation !== this.connectionGeneration) {
+                if (this.device !== device) device.gatt.disconnect();
+                return false;
+            }
+            this.server = server;
+            this.cadenceSource = null;
+            this.lastCSCCrankRevs = this.lastCSCCrankTime = undefined;
+            this.lastCrankRevs = this.lastCrankTime = undefined;
+            this.lastValidCadenceTime = undefined;
+            this.hasTrainerHR = false;
+            await this.subscribeToMetrics();
+            if (generation !== this.connectionGeneration || !device.gatt.connected) return false;
+            await this.initializeFTMS();
+            if (generation !== this.connectionGeneration || !device.gatt.connected) return false;
+            this.ready = true;
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+            this.reconnectAttempts = 0;
+            this.log(`Trainer ready: ${device.name}`, 'success');
+            this.onConnectionChange?.(true);
+            return true;
+        } catch (error) {
+            if (generation === this.connectionGeneration) {
+                this.controlPointChar = null;
+                device.gatt.disconnect();
+            }
+            throw error;
+        }
+    }
+
+    scheduleReconnect() {
+        if (!this.device || this.reconnectTimer || this.reconnectAttempts >= 5) {
+            if (this.reconnectAttempts >= 5) this.log('Reconnect failed. Use Connect to try again.', 'error');
+            return;
+        }
+        const device = this.device;
+        const timer = setTimeout(async () => {
+            this.reconnectAttempts++;
+            try {
+                if (this.device === device) await this.connectToDevice(device);
+            } catch (error) {
+                this.log(`Reconnect attempt ${this.reconnectAttempts}: ${error.message}`, 'warning');
+            } finally {
+                if (this.reconnectTimer === timer) {
+                    this.reconnectTimer = null;
+                    if (this.device === device && !this.ready) this.scheduleReconnect();
+                }
+            }
+        }, Math.min(1000 * 2 ** this.reconnectAttempts, 10000));
+        this.reconnectTimer = timer;
     }
 
     // FTMS (Fitness Machine Service) UUIDs
@@ -109,6 +190,8 @@ class FTMSController {
     }
 
     async connect() {
+        if (this.isConnected()) return true;
+        if (this.device) this.disconnect();
         try {
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const isHttps = window.location.protocol === 'https:';
@@ -120,7 +203,7 @@ class FTMSController {
             this.log('Scanning for smart trainers...', 'info');
 
             // Support popular smart trainers via FTMS
-            this.device = await navigator.bluetooth.requestDevice({
+            const device = await navigator.bluetooth.requestDevice({
                 filters: [
                     // Zwift trainers
                     { namePrefix: 'Zwift' },
@@ -161,12 +244,8 @@ class FTMSController {
                 ]
             });
 
-            this.log(`Found: ${this.device.name}`, 'success');
-            this.server = await this.device.gatt.connect();
-            this.log('Connected to GATT server', 'success');
-
-            await this.subscribeToMetrics();
-            await this.initializeFTMS();
+            this.log(`Found: ${device.name}`, 'success');
+            if (!await this.connectToDevice(device)) return false;
 
             // Save device for auto-reconnect
             this.saveLastDevice();
@@ -241,9 +320,11 @@ class FTMSController {
     }
 
     async subscribeToMetrics() {
+        const server = this.server;
+        const signal = this.notificationController.signal;
         // Try to subscribe to FTMS Indoor Bike Data first (most common for cadence)
         try {
-            const ftmsService = await this.server.getPrimaryService(this.FITNESS_MACHINE_SERVICE);
+            const ftmsService = await server.getPrimaryService(this.FITNESS_MACHINE_SERVICE);
             const indoorBikeChar = await ftmsService.getCharacteristic(0x2AD2); // Indoor Bike Data
 
             indoorBikeChar.addEventListener('characteristicvaluechanged', (e) => {
@@ -321,7 +402,7 @@ class FTMSController {
                 } catch (err) {
                     console.error('Indoor Bike Data parse error:', err);
                 }
-            });
+            }, { signal });
 
             await indoorBikeChar.startNotifications();
             this.log('Subscribed to Indoor Bike Data (cadence, power)', 'success');
@@ -332,7 +413,7 @@ class FTMSController {
         // Subscribe to Cycling Speed and Cadence Service (for cadence)
         try {
             this.log('Attempting to connect to CSC Service...', 'info');
-            const cscService = await this.server.getPrimaryService(this.CYCLING_SPEED_CADENCE_SERVICE);
+            const cscService = await server.getPrimaryService(this.CYCLING_SPEED_CADENCE_SERVICE);
             this.log('Found CSC Service, getting characteristic...', 'info');
             const cscChar = await cscService.getCharacteristic(0x2A5B); // CSC Measurement
             this.log('Found CSC Measurement characteristic', 'info');
@@ -398,7 +479,7 @@ class FTMSController {
                 } catch (err) {
                     console.error('CSC Measurement parse error:', err);
                 }
-            });
+            }, { signal });
 
             await cscChar.startNotifications();
             this.log('Subscribed to Cycling Speed and Cadence (cadence)', 'success');
@@ -408,14 +489,14 @@ class FTMSController {
 
         // Subscribe to Heart Rate
         try {
-            const hrService = await this.server.getPrimaryService(this.HEART_RATE_SERVICE);
+            const hrService = await server.getPrimaryService(this.HEART_RATE_SERVICE);
             const hrChar = await hrService.getCharacteristic(0x2a37);
             hrChar.addEventListener('characteristicvaluechanged', (e) => {
                 const flags = e.target.value.getUint8(0);
                 this.metrics.hr = flags & 0x01 ? e.target.value.getUint16(1, true) : e.target.value.getUint8(1);
                 this.metrics.timestamp = Date.now();
                 if (this.onMetricsUpdate) this.onMetricsUpdate(this.metrics);
-            });
+            }, { signal });
             await hrChar.startNotifications();
             this.hasTrainerHR = true;
             this.log('Subscribed to Heart Rate', 'success');
@@ -426,7 +507,7 @@ class FTMSController {
 
         // Also try Cycling Power Service as fallback (for cadence from crank revolutions)
         try {
-            const cpService = await this.server.getPrimaryService(this.CYCLING_POWER_SERVICE);
+            const cpService = await server.getPrimaryService(this.CYCLING_POWER_SERVICE);
             const cpChar = await cpService.getCharacteristic(0x2a63);
             cpChar.addEventListener('characteristicvaluechanged', (e) => {
                 try {
@@ -511,7 +592,7 @@ class FTMSController {
                 } catch (err) {
                     console.error('Power measurement parse error:', err);
                 }
-            });
+            }, { signal });
             await cpChar.startNotifications();
             this.log('Subscribed to Cycling Power Service', 'success');
         } catch (e) {
@@ -522,57 +603,84 @@ class FTMSController {
     async initializeFTMS() {
         try {
             this.log('Initializing FTMS...', 'info');
-            const ftmsService = await this.server.getPrimaryService(this.FITNESS_MACHINE_SERVICE);
-
-            // Get the control point characteristic
-            this.controlPointChar = await ftmsService.getCharacteristic(this.FITNESS_MACHINE_CONTROL_POINT);
+            const server = this.server;
+            const signal = this.notificationController.signal;
+            const ftmsService = await server.getPrimaryService(this.FITNESS_MACHINE_SERVICE);
+            const characteristic = await ftmsService.getCharacteristic(this.FITNESS_MACHINE_CONTROL_POINT);
+            if (signal.aborted || this.server !== server) throw new Error('Connection cancelled');
+            this.controlPointChar = characteristic;
 
             // Subscribe to control point responses
             this.controlPointChar.addEventListener('characteristicvaluechanged', (e) => {
-                const data = new Uint8Array(e.target.value.buffer);
+                const value = e.target.value;
+                const data = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
                 const responseStr = Array.from(data).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
 
                 // Decode response
                 if (data[0] === 0x80) {
                     const opcode = data[1];
                     const result = data[2];
+                    if (this.pendingResponse?.opcode === opcode && this.pendingResponse.characteristic === e.target) {
+                        this.pendingResponse.finish(result === 0x01);
+                    }
                     const resultCodes = ['', 'Success', 'Not Supported', 'Invalid Param', 'Failed', 'Control Not Permitted'];
                     this.log(`FTMS Response: ${responseStr} (${resultCodes[result] || 'Unknown'})`, result === 0x01 ? 'success' : 'error');
                 } else {
                     this.log(`FTMS Response: ${responseStr}`, 'info');
                 }
-            });
+            }, { signal });
             await this.controlPointChar.startNotifications();
 
             // Send Request Control command (0x00) - no parameters needed
             const requestControl = new Uint8Array([0x00]);
-            await this.controlPointChar.writeValue(requestControl);
-            this.log('Sent Request Control (0x00)', 'info');
-
-            // Wait for response
-            await new Promise(resolve => setTimeout(resolve, 200));
+            if (!await this.sendCommand(requestControl)) throw new Error('Trainer did not grant FTMS control');
 
         } catch (e) {
             this.log(`FTMS init error: ${e.message}`, 'error');
+            throw e;
         }
     }
 
-    async sendCommand(data) {
-        try {
-            if (!this.controlPointChar) {
-                this.log('FTMS not initialized', 'error');
+    sendCommand(data) {
+        const characteristic = this.controlPointChar;
+        const generation = this.connectionGeneration;
+        const targetSequence = data[0] === 0x05 ? ++this.targetSequence : null;
+        // FTMS allows one outstanding control procedure, not concurrent GATT writes.
+        this.commandQueue = this.commandQueue.then(async () => {
+            if (generation !== this.connectionGeneration || !characteristic || characteristic !== this.controlPointChar || !this.device?.gatt.connected) return false;
+            if (targetSequence !== null && targetSequence !== this.targetSequence) return false;
+            let timer;
+            const response = new Promise(resolve => {
+                this.pendingResponse = { characteristic, opcode: data[0], finish: resolve };
+            });
+            const deadline = new Promise(resolve => {
+                timer = setTimeout(() => {
+                    resolve(false);
+                    // A late acknowledgement cannot safely be matched to the next command.
+                    if (characteristic === this.controlPointChar) this.device?.gatt.disconnect();
+                }, 5000);
+            });
+            try {
+                // Wait for both GATT completion and the FTMS response, but bound either stall.
+                const success = await Promise.race([
+                    Promise.all([characteristic.writeValue(data), response]).then(([, accepted]) => accepted),
+                    deadline
+                ]);
+                if (!success) this.log('Trainer command failed or timed out', 'error');
+                return success;
+            } catch (error) {
+                this.log(`Write failed: ${error.message}`, 'error');
                 return false;
+            } finally {
+                clearTimeout(timer);
+                this.pendingResponse = null;
             }
-
-            await this.controlPointChar.writeValue(data);
-            return true;
-        } catch (error) {
-            this.log(`Write failed: ${error.message}`, 'error');
-            return false;
-        }
+        });
+        return this.commandQueue;
     }
 
     async setTargetPower(power) {
+        if (!this.ready || !Number.isFinite(power) || power < 0 || power > 32767) return false;
         const data = new Uint8Array(3);
         data[0] = 0x05; // Set Target Power opcode
         data[1] = power & 0xFF; // Power low byte
@@ -581,19 +689,28 @@ class FTMSController {
     }
 
     disconnect() {
+        this.connectionGeneration++;
+        this.notificationController?.abort();
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+        this.reconnectAttempts = 0;
+        this.ready = false;
+        if (this.pendingResponse) this.pendingResponse.finish(false);
         if (this.device) {
+            this.device.removeEventListener('gattserverdisconnected', this.handleTrainerDisconnect);
             this.device.gatt.disconnect();
             this.device = null;
-            this.server = null;
-            this.controlPointChar = null;
-            this.hasTrainerHR = false;
             this.log('Disconnected', 'info');
         }
+        this.server = null;
+        this.controlPointChar = null;
+        this.hasTrainerHR = false;
+        this.onConnectionChange?.(false);
         // Also disconnect HRM if connected
         this.disconnectHRM();
     }
 
     isConnected() {
-        return this.device && this.device.gatt.connected;
+        return Boolean(this.ready && this.device?.gatt.connected);
     }
 }

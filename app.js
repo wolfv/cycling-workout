@@ -19,6 +19,21 @@ class App {
         // Setup FTMS callbacks
         this.ftms.onLog = (msg, type) => this.log(msg, type);
         this.ftms.onMetricsUpdate = (metrics) => this.handleMetricsUpdate(metrics);
+        this.ftms.onConnectionChange = (connected) => {
+            if (window.Alpine) {
+                Alpine.store('app').setConnected(connected, this.ftms.device?.name);
+                Alpine.store('app').setHasTrainerHR(connected && this.ftms.hasTrainerHR);
+            }
+            this.updateQuickControlAvailability();
+            if (connected) {
+                if (window.workoutDesigner?.isRunning) {
+                    // Keep the shared workout clock running through Bluetooth outages.
+                    window.workoutDesigner.executeInterval(0);
+                } else {
+                    this.ftms.setTargetPower(0);
+                }
+            }
+        };
 
         // Initialize workout designer
         window.workoutDesigner = new WorkoutDesigner(this.ftms);
@@ -126,7 +141,7 @@ class App {
         }
 
         // Check if bluetooth.getDevices() is available
-        if (!navigator.bluetooth.getDevices) {
+        if (!navigator.bluetooth?.getDevices) {
             this.log('Auto-reconnect not supported in this browser', 'info');
             return;
         }
@@ -140,7 +155,6 @@ class App {
                 if (window.Alpine) {
                     Alpine.store('app').setConnected(true, this.ftms.device?.name);
                 }
-                this.startMetricsBroadcast();
                 this.updateQuickControlAvailability();
             }
         }, 1000);
@@ -338,6 +352,7 @@ class App {
     }
 
     handleWorkoutStop() {
+        localStorage.removeItem('workout_start_info');
         // Stop recording
         const dataPoints = this.workoutRecorder.stop();
         this.log(`Recording stopped: ${dataPoints} data points`, 'info');
@@ -836,10 +851,7 @@ class App {
             return;
         }
 
-        library.innerHTML = names.map(name => {
-            const workout = workouts[name];
-            return this.createWorkoutCard(name, workout);
-        }).join('');
+        library.replaceChildren(...names.map(name => this.createWorkoutCard(name, workouts[name])));
 
         setTimeout(() => {
             lucide.createIcons();
@@ -857,7 +869,7 @@ class App {
             if (powerType === 'absolute') {
                 power = i.power || 0;
             } else {
-                const percentage = i.percentage || 100;
+                const percentage = powerType === 'ramp' ? (i.percentageLow + i.percentageHigh) / 2 : (i.percentage ?? 100);
                 power = Math.round((workout.ftp || 200) * (percentage / 100));
             }
             
@@ -873,34 +885,44 @@ class App {
 
         const created = workout.created ? new Date(workout.created).toLocaleDateString() : 'Unknown';
         
-        // Get description if available
-        const description = workout.description ? `<div class="workout-card-description">${workout.description}</div>` : '';
-
-        return `
-            <div class="workout-card" onclick="app.loadWorkoutFromLibrary('${name}')">
+        const card = document.createElement('div');
+        card.className = 'workout-card';
+        card.addEventListener('click', () => this.loadWorkoutFromLibrary(name));
+        card.innerHTML = `
                 <div class="workout-card-header">
                     <div>
-                        <div class="workout-card-title">${name}</div>
-                        ${description}
+                        <button class="workout-card-title" type="button"></button>
+                        <div class="workout-card-description"></div>
                         <div class="workout-card-meta">Created: ${created}</div>
                     </div>
                     <div class="workout-card-actions">
-                        <button onclick="event.stopPropagation(); app.deleteWorkoutFromLibrary('${name}')" class="btn btn-sm btn-ghost" title="Delete">
+                        <button data-action="delete" class="btn btn-sm btn-ghost" title="Delete" aria-label="Delete workout">
                             <i data-lucide="trash-2"></i>
                         </button>
-                        <button onclick="event.stopPropagation(); app.exportWorkoutByName('${name}')" class="btn btn-sm" title="Export">
+                        <button data-action="export" class="btn btn-sm" title="Export" aria-label="Export workout">
                             <i data-lucide="download"></i>
                         </button>
                     </div>
                 </div>
-                <canvas id="preview-${name.replace(/\s+/g, '-')}" class="workout-preview"></canvas>
+                <canvas class="workout-preview"></canvas>
                 <div class="workout-card-stats">
                     <div><i data-lucide="clock"></i> ${formatDuration(totalDuration)}</div>
                     <div><i data-lucide="gauge"></i> ${avgPower}W avg</div>
                     <div><i data-lucide="flame"></i> ${totalWork.toFixed(1)}kJ</div>
                 </div>
-            </div>
         `;
+        card.querySelector('.workout-card-title').textContent = name;
+        card.querySelector('.workout-card-description').textContent = workout.description || '';
+        card.querySelector('canvas').id = `preview-${name.replace(/\s+/g, '-')}`;
+        card.querySelector('[data-action="delete"]').addEventListener('click', event => {
+            event.stopPropagation();
+            this.deleteWorkoutFromLibrary(name);
+        });
+        card.querySelector('[data-action="export"]').addEventListener('click', event => {
+            event.stopPropagation();
+            this.exportWorkoutByName(name);
+        });
+        return card;
     }
 
     loadWorkoutFromLibrary(name) {
@@ -994,6 +1016,7 @@ class App {
 
     disconnectSession() {
         if (confirm('Leave this session?')) {
+            this.cancelSessionCountdown();
             this.sessionManager.disconnect();
             this.log('Left session', 'warning');
 
@@ -1140,11 +1163,14 @@ class App {
 
         this.log('Received workout from host!', 'success');
 
-        // Load the workout intervals into the designer
-        window.workoutDesigner.intervals = workout.intervals.map(i => ({
-            ...i,
-            id: Date.now() + Math.random()
-        }));
+        // A reconnect must not replace the intervals of an active ride.
+        if (window.workoutDesigner.isRunning) return;
+        try {
+            window.workoutDesigner.intervals = WorkoutDesigner.normalizeIntervals(workout.intervals);
+        } catch (error) {
+            this.log(`Invalid shared workout: ${error.message}`, 'error');
+            return;
+        }
 
         // Don't override local FTP - each participant uses their own
         window.workoutDesigner.render();
@@ -1154,82 +1180,50 @@ class App {
         this.raceTrack.setWorkout(workout.intervals, window.workoutDesigner.ftp);
 
         // Show notification
-        alert(`Workout received: ${workout.name || 'Unnamed Workout'}\n\nThe workout has been loaded and will scale to your FTP (${window.workoutDesigner.ftp}W).\n\nYou can:\n- Change your FTP in the "My FTP" section\n- Adjust workout intensity with the "Effective FTP" slider during the workout`);
+        this.log(`Loaded shared workout: ${workout.name || 'Unnamed Workout'} (your FTP: ${window.workoutDesigner.ftp}W)`, 'success');
+    }
+
+    cancelSessionCountdown() {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+        const countdown = document.getElementById('countdownDisplay');
+        if (countdown) countdown.style.display = 'none';
     }
 
     handleSessionStart(startTime) {
-        const delay = startTime - Date.now();
-        const seconds = Math.ceil(delay / 1000);
-
-        // If startTime is in the past, join workout in progress
-        if (delay < -1000) { // More than 1 second in the past
-            const elapsedMs = Math.abs(delay);
-            this.log(`Joining workout in progress (started ${Math.floor(elapsedMs / 1000)}s ago)...`, 'info');
-
-            try {
-                // Start the workout with the original start time for proper sync
-                window.workoutDesigner.startWorkout(startTime);
-                this.log('Synced to ongoing workout!', 'success');
-
-                // Update host controls (if they exist)
-                const startBtn = document.getElementById('startSyncedBtnSidebar');
-                if (startBtn) startBtn.style.display = 'none';
-            } catch (error) {
-                console.error('Error joining workout:', error);
-                this.log('Failed to join workout: ' + error.message, 'error');
-            }
-            return;
-        }
-
-        this.log(`Workout starting in ${seconds} seconds...`, 'info');
-
-        // Show countdown
+        if (!Number.isFinite(startTime) || window.workoutDesigner.isRunning) return;
+        this.cancelSessionCountdown();
         const countdownEl = document.getElementById('countdownDisplay');
         const countdownNum = document.getElementById('countdownNumber');
-
-        if (countdownEl && countdownNum) {
-            countdownEl.style.display = 'block';
-
-            let remaining = seconds;
-            countdownNum.textContent = remaining;
-            const countdownInterval = setInterval(() => {
-                remaining--;
-                countdownNum.textContent = remaining;
-
-                if (remaining <= 0) {
-                    clearInterval(countdownInterval);
-                    countdownEl.style.display = 'none';
-
-                    // Start workout with exact start time
-                    this.log('Starting workout now!', 'success');
-                    try {
-                        window.workoutDesigner.startWorkout(startTime);
-
-                        // Update host controls (if they exist)
-                        const startBtn = document.getElementById('startSyncedBtnSidebar');
-                        if (startBtn) startBtn.style.display = 'none';
-                    } catch (error) {
-                        console.error('Error starting workout:', error);
-                        this.log('Failed to start workout: ' + error.message, 'error');
-                    }
-                }
-            }, 1000);
-        } else {
-            // If countdown elements don't exist, start immediately
-            this.log('Starting workout immediately (no countdown display)', 'info');
-            window.workoutDesigner.startWorkout(startTime);
-        }
+        const tick = () => {
+            const remaining = Math.ceil((startTime - Date.now()) / 1000);
+            if (remaining > 0) {
+                if (countdownEl) countdownEl.style.display = 'block';
+                if (countdownNum) countdownNum.textContent = remaining;
+                return;
+            }
+            this.cancelSessionCountdown();
+            window.workoutDesigner.startWorkout(startTime).catch(error => {
+                this.log(`Failed to start workout: ${error.message}`, 'error');
+            });
+            const startBtn = document.getElementById('startSyncedBtnSidebar');
+            if (startBtn) startBtn.style.display = 'none';
+        };
+        this.countdownInterval = setInterval(tick, 100);
+        tick();
     }
 
     handleSessionEnd() {
+        this.cancelSessionCountdown();
         this.log('Host ended the workout', 'warning');
         if (window.workoutDesigner.isRunning) {
             window.workoutDesigner.stopWorkout();
         }
 
         // Reset host controls
-        document.getElementById('startSyncedBtn').style.display = 'block';
-        document.getElementById('endSyncedBtn').classList.add('hidden');
+        const startBtn = document.getElementById('startSyncedBtn');
+        if (startBtn) startBtn.style.display = 'block';
+        document.getElementById('endSyncedBtn')?.classList.add('hidden');
     }
 
     startSyncedWorkout() {
@@ -1266,7 +1260,7 @@ class App {
         }));
 
         // Broadcast to others
-        this.sessionManager.startSynchronizedWorkout(countdownSeconds);
+        this.sessionManager.startSynchronizedWorkout(countdownSeconds, startTime);
 
         // Also trigger countdown for host
         this.handleSessionStart(startTime);
@@ -1295,6 +1289,7 @@ class App {
     }
 
     endSyncedWorkout() {
+        this.cancelSessionCountdown();
         this.sessionManager.endWorkout();
         if (window.workoutDesigner.isRunning) {
             window.workoutDesigner.stopWorkout();

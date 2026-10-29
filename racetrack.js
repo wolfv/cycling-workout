@@ -66,11 +66,18 @@ class RaceTrackVisualizer {
     }
 
     drawIntervals(padding, trackHeight, trackWidth) {
-        const maxPower = Math.max(...this.intervals.map(i => Math.round(this.ftp * (i.percentage / 100))));
+        const powers = this.intervals.map(interval => {
+            if (interval.powerType === 'absolute') return interval.power;
+            const percentage = interval.powerType === 'ramp'
+                ? (interval.percentageLow + interval.percentageHigh) / 2
+                : (interval.percentage ?? 100);
+            return Math.round(this.ftp * percentage / 100);
+        });
+        const maxPower = Math.max(1, ...powers);
 
         let x = padding;
-        this.intervals.forEach(interval => {
-            const power = Math.round(this.ftp * (interval.percentage / 100));
+        this.intervals.forEach((interval, index) => {
+            const power = powers[index];
             const barWidth = (interval.duration / this.totalDuration) * trackWidth;
             const barHeight = (power / maxPower) * trackHeight;
 

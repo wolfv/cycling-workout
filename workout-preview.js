@@ -18,17 +18,16 @@ class WorkoutPreview {
         const powers = intervals.map(i => {
             const powerType = i.powerType || 'relative';
             if (powerType === 'ramp') {
-                // For ramps, use the high value for max calculation
-                return Math.round(ftp * ((i.percentageHigh || 100) / 100));
+                return Math.round(ftp * Math.max(i.percentageLow ?? 50, i.percentageHigh ?? 100) / 100);
             } else if (powerType === 'absolute') {
                 return i.power || 0;
             } else {
-                return Math.round(ftp * ((i.percentage || 100) / 100));
+                return Math.round(ftp * ((i.percentage ?? 100) / 100));
             }
         });
 
         // Calculate max power and total duration
-        const maxPower = Math.max(...powers);
+        const maxPower = Math.max(1, ...powers);
         const totalDuration = intervals.reduce((sum, i) => sum + i.duration, 0);
 
         // Color mapping
@@ -49,8 +48,8 @@ class WorkoutPreview {
 
             if (powerType === 'ramp') {
                 // Draw ramp as a trapezoid
-                const powerLow = Math.round(ftp * ((interval.percentageLow || 50) / 100));
-                const powerHigh = Math.round(ftp * ((interval.percentageHigh || 100) / 100));
+                const powerLow = Math.round(ftp * ((interval.percentageLow ?? 50) / 100));
+                const powerHigh = Math.round(ftp * ((interval.percentageHigh ?? 100) / 100));
                 const barHeightLow = (powerLow / maxPower) * height;
                 const barHeightHigh = (powerHigh / maxPower) * height;
 

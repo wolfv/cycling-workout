@@ -26,6 +26,34 @@ class WorkoutDesigner {
         this.progressVisualizer = null;
     }
 
+    static normalizeIntervals(intervals) {
+        if (!Array.isArray(intervals)) throw new Error('Invalid workout: expected intervals array');
+        return intervals.map((interval, index) => {
+            if (!interval || !Number.isFinite(interval.duration) || interval.duration <= 0 || interval.duration > 86400) {
+                throw new Error(`Interval ${index + 1}: duration must be between 0 and 86400 seconds`);
+            }
+            const powerType = interval.powerType || (interval.power !== undefined ? 'absolute' : 'relative');
+            const fields = { relative: ['percentage'], absolute: ['power'], ramp: ['percentageLow', 'percentageHigh'] }[powerType];
+            if (!Array.isArray(fields)) throw new Error(`Interval ${index + 1}: invalid power type`);
+            const normalized = {
+                id: Date.now() + Math.random(),
+                name: String(interval.name || `Interval ${index + 1}`),
+                type: String(interval.type || 'custom'),
+                duration: interval.duration,
+                powerType
+            };
+            for (const field of fields) {
+                const value = interval[field];
+                const maximum = field === 'power' ? 2000 : 300;
+                if (!Number.isFinite(value) || value < 0 || value > maximum) {
+                    throw new Error(`Interval ${index + 1}: ${field} must be between 0 and ${maximum}`);
+                }
+                normalized[field] = value;
+            }
+            return normalized;
+        });
+    }
+
     clampIntensity(scale) {
         if (isNaN(scale)) return 1;
         return Math.min(Math.max(scale, 0.5), 1.5);
@@ -66,9 +94,9 @@ class WorkoutDesigner {
 
         // Handle ramp intervals
         if (powerType === 'ramp') {
-            const percentageLow = interval.percentageLow || 50;
-            const percentageHigh = interval.percentageHigh || 100;
-            const progress = Math.min(1, elapsedSeconds / interval.duration);
+            const percentageLow = interval.percentageLow ?? 50;
+            const percentageHigh = interval.percentageHigh ?? 100;
+            const progress = Math.max(0, Math.min(1, elapsedSeconds / interval.duration));
             const currentPercentage = percentageLow + (percentageHigh - percentageLow) * progress;
             return Math.round(this.ftp * this.intensityScale * (currentPercentage / 100));
         }
@@ -78,7 +106,7 @@ class WorkoutDesigner {
             return Math.round(base * this.intensityScale);
         }
 
-        const percentage = interval.percentage || 100;
+        const percentage = interval.percentage ?? 100;
         return Math.round(this.ftp * this.intensityScale * (percentage / 100));
     }
 
@@ -109,12 +137,13 @@ class WorkoutDesigner {
     }
 
     applyCurrentIntervalTarget(logAdjustment = false) {
-        if (!this.isRunning || this.currentIntervalIndex < 0) return;
+        if (!this.isRunning || this.currentIntervalIndex < 0 || Date.now() < this.workoutStartTime) return;
 
         const currentInterval = this.intervals[this.currentIntervalIndex];
         if (!currentInterval) return;
 
-        const power = this.getIntervalPower(currentInterval);
+        const elapsed = (Date.now() - this.intervalStartTime) / 1000;
+        const power = this.getIntervalPower(currentInterval, elapsed);
 
         if (logAdjustment) {
             const currentName = currentInterval.name || 'Interval';
@@ -128,6 +157,7 @@ class WorkoutDesigner {
     }
 
     addInterval(type) {
+        if (this.isRunning) return;
         const presets = {
             warmup: { percentage: 50, duration: 300, type: 'warmup', name: 'Warmup', powerType: 'relative' },
             endurance: { percentage: 65, duration: 600, type: 'endurance', name: 'Endurance', powerType: 'relative' },
@@ -150,12 +180,14 @@ class WorkoutDesigner {
     }
 
     removeInterval(id) {
+        if (this.isRunning) return;
         this.intervals = this.intervals.filter(i => i.id !== id);
         this.render();
         this.updateWorkoutInfo();
     }
 
     clearWorkout() {
+        if (this.isRunning) return;
         if (confirm('Clear all intervals?')) {
             this.intervals = [];
             this.render();
@@ -164,6 +196,7 @@ class WorkoutDesigner {
     }
 
     updateInterval(id, updates) {
+        if (this.isRunning) return;
         const interval = this.intervals.find(i => i.id === id);
         if (interval) {
             Object.assign(interval, updates);
@@ -202,8 +235,8 @@ class WorkoutDesigner {
         let power, displayText;
 
         if (powerType === 'ramp') {
-            const percentageLow = interval.percentageLow || 50;
-            const percentageHigh = interval.percentageHigh || 100;
+            const percentageLow = interval.percentageLow ?? 50;
+            const percentageHigh = interval.percentageHigh ?? 100;
             const powerLow = Math.round(this.ftp * this.intensityScale * (percentageLow / 100));
             const powerHigh = Math.round(this.ftp * this.intensityScale * (percentageHigh / 100));
             power = powerHigh; // Use high power for display
@@ -213,7 +246,7 @@ class WorkoutDesigner {
             power = this.getIntervalPower(interval);
             displayText = `${basePower}W Absolute${this.intensityScale !== 1 ? ` → ${power}W` : ''}`;
         } else {
-            const percentage = interval.percentage || 100;
+            const percentage = interval.percentage ?? 100;
             power = this.getIntervalPower(interval);
             const scaledPercent = Math.round(percentage * this.intensityScale);
             displayText = `${percentage}% FTP${this.intensityScale !== 1 ? ` → ${scaledPercent}%` : ''}`;
@@ -221,14 +254,17 @@ class WorkoutDesigner {
 
         el.innerHTML = `
             <div class="interval-controls">
-                <button class="interval-delete" onclick="workoutDesigner.removeInterval(${interval.id})">×</button>
+                <button class="interval-delete" aria-label="Delete interval">×</button>
             </div>
-            <div class="interval-info">${interval.name}</div>
+            <div class="interval-info"></div>
             <div class="interval-power">${power}W</div>
             <div class="interval-percentage">${displayText}</div>
             <div class="interval-duration">${this.formatDuration(interval.duration)}</div>
             <div class="resize-handle"></div>
         `;
+
+        el.querySelector('.interval-info').textContent = interval.name;
+        el.querySelector('.interval-delete').addEventListener('click', () => this.removeInterval(interval.id));
 
         // Make draggable
         el.draggable = true;
@@ -269,7 +305,7 @@ class WorkoutDesigner {
 
     handleDrop(e, targetInterval) {
         e.preventDefault();
-        if (!this.draggedInterval || this.draggedInterval.id === targetInterval.id) return;
+        if (this.isRunning || !this.draggedInterval || this.draggedInterval.id === targetInterval.id) return;
 
         const draggedIndex = this.intervals.findIndex(i => i.id === this.draggedInterval.id);
         const targetIndex = this.intervals.findIndex(i => i.id === targetInterval.id);
@@ -283,6 +319,7 @@ class WorkoutDesigner {
     }
 
     showEditDialog(interval) {
+        if (this.isRunning) return;
         // Determine current power type
         const powerType = interval.powerType || 'relative';
         
@@ -335,7 +372,7 @@ class WorkoutDesigner {
     updateWorkoutInfo() {
         const totalDuration = this.intervals.reduce((sum, i) => sum + i.duration, 0);
         const totalWork = this.intervals.reduce((sum, i) => {
-            const power = this.getIntervalPower(i);
+            const power = this.getIntervalPower(i, i.duration / 2);
             return sum + (power * i.duration);
         }, 0) / 1000; // kJ
         const avgPower = totalDuration > 0 ? Math.round(totalWork * 1000 / totalDuration) : 0;
@@ -346,6 +383,8 @@ class WorkoutDesigner {
     }
 
     async startWorkout(syncStartTime = null) {
+        if (this.isRunning) return;
+
         if (this.intervals.length === 0) {
             alert('Please add some intervals first!');
             return;
@@ -356,10 +395,16 @@ class WorkoutDesigner {
             return;
         }
 
-        this.isRunning = true;
+        // Validate before starting timers or sending trainer commands.
+        try {
+            WorkoutDesigner.normalizeIntervals(this.intervals);
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
+        if (syncStartTime !== null && !Number.isFinite(syncStartTime)) return;
 
-        // Use provided sync time or current time
-        this.workoutStartTime = syncStartTime || Date.now();
+        this.workoutStartTime = syncStartTime ?? Date.now();
         const now = Date.now();
         const elapsedTotal = now - this.workoutStartTime;
 
@@ -394,11 +439,12 @@ class WorkoutDesigner {
             this.ftms.log('🎯 Starting workout!', 'success');
         }
 
+        this.isRunning = true;
         this.currentIntervalIndex = currentIntervalIndex;
         this.intervalStartTime = this.workoutStartTime + elapsedBeforeCurrentInterval;
 
         // Initialize progress visualizer
-        this.progressVisualizer = new WorkoutProgressVisualizer('workoutProgressChart');
+        this.progressVisualizer ||= new WorkoutProgressVisualizer('workoutProgressChart');
         this.progressVisualizer.setWorkout(this.intervals, this.ftp, this.intensityScale);
         this.progressVisualizer.start(this.workoutStartTime);
 
@@ -411,39 +457,53 @@ class WorkoutDesigner {
             this.onWorkoutStart();
         }
 
-        await this.executeInterval(currentIntervalIndex);
+        if (this.workoutStartTime > Date.now()) {
+            this.workoutTimer = setTimeout(() => this.executeInterval(currentIntervalIndex), this.workoutStartTime - Date.now());
+        } else {
+            await this.executeInterval(currentIntervalIndex);
+        }
     }
 
     async executeInterval(index) {
-        if (!this.isRunning || index >= this.intervals.length) {
+        if (!this.isRunning) return;
+        clearTimeout(this.workoutTimer);
+        clearInterval(this.rampUpdateInterval);
+        this.workoutTimer = null;
+        this.rampUpdateInterval = null;
+        if (Date.now() < this.workoutStartTime) {
+            this.workoutTimer = setTimeout(() => this.executeInterval(index), this.workoutStartTime - Date.now());
+            return;
+        }
+
+        let startTime = this.workoutStartTime;
+        for (let i = 0; i < index; i++) {
+            startTime += this.intervals[i].duration * 1000;
+        }
+        // Background tabs can delay timers: skip expired intervals, not the workout clock.
+        while (index < this.intervals.length && Date.now() >= startTime + this.intervals[index].duration * 1000) {
+            startTime += this.intervals[index].duration * 1000;
+            index++;
+        }
+        if (index >= this.intervals.length) {
             this.stopWorkout();
             return;
         }
 
         this.currentIntervalIndex = index;
-
-        // Calculate interval start time based on workout start time + accumulated previous intervals
-        // This ensures synchronization with other participants
-        let accumulatedTime = 0;
-        for (let i = 0; i < index; i++) {
-            accumulatedTime += this.intervals[i].duration * 1000;
-        }
-        this.intervalStartTime = this.workoutStartTime + accumulatedTime;
-
+        this.intervalStartTime = startTime;
         const interval = this.intervals[index];
-
         const powerType = interval.powerType || 'relative';
-        const power = this.getIntervalPower(interval, 0);
+        const power = this.getIntervalPower(interval, (Date.now() - startTime) / 1000);
         let powerDisplay;
         if (powerType === 'ramp') {
-            const percentageLow = interval.percentageLow || 50;
-            const percentageHigh = interval.percentageHigh || 100;
+            const percentageLow = interval.percentageLow ?? 50;
+            const percentageHigh = interval.percentageHigh ?? 100;
             powerDisplay = `Ramp from ${percentageLow}% to ${percentageHigh}% FTP`;
         } else if (powerType === 'absolute') {
             const basePower = interval.power || 0;
             powerDisplay = `${power}W (Absolute${this.intensityScale !== 1 ? ` from ${basePower}W` : ''})`;
         } else {
-            const percentage = interval.percentage || 100;
+            const percentage = interval.percentage ?? 100;
             const scaledPercent = Math.round(percentage * this.intensityScale);
             powerDisplay = `${power}W (${percentage}% FTP${this.intensityScale !== 1 ? ` → ${scaledPercent}%` : ''})`;
         }
@@ -456,6 +516,10 @@ class WorkoutDesigner {
         if (powerType === 'ramp') {
             this.rampUpdateInterval = setInterval(() => {
                 const elapsed = (Date.now() - this.intervalStartTime) / 1000;
+                if (elapsed >= interval.duration) {
+                    this.executeInterval(index + 1);
+                    return;
+                }
                 const currentPower = this.getIntervalPower(interval, elapsed);
                 this.ftms.setTargetPower(currentPower);
                 if (this.onTargetPowerChange) {
@@ -464,23 +528,17 @@ class WorkoutDesigner {
             }, 1000); // Update every second
         }
 
-        // Set initial target power
-        await this.ftms.setTargetPower(power);
+        // Schedule against the shared clock, independent of Bluetooth write latency.
+        this.workoutTimer = setTimeout(() => this.executeInterval(index + 1),
+            Math.max(0, startTime + interval.duration * 1000 - Date.now()));
+        this.ftms.setTargetPower(power);
         if (this.onTargetPowerChange) {
             this.onTargetPowerChange(power);
         }
-
-        // Wait for interval duration
-        this.workoutTimer = setTimeout(() => {
-            if (this.rampUpdateInterval) {
-                clearInterval(this.rampUpdateInterval);
-                this.rampUpdateInterval = null;
-            }
-            this.executeInterval(index + 1);
-        }, interval.duration * 1000);
     }
 
     stopWorkout() {
+        if (!this.isRunning) return;
         if (this.workoutTimer) {
             clearTimeout(this.workoutTimer);
             this.workoutTimer = null;
@@ -505,7 +563,6 @@ class WorkoutDesigner {
         // Clear progress visualizer
         if (this.progressVisualizer) {
             this.progressVisualizer.clear();
-            this.progressVisualizer = null;
         }
 
         // Reset power
@@ -534,7 +591,7 @@ class WorkoutDesigner {
         // Update current interval info
         const currentInterval = this.intervals[this.currentIntervalIndex];
         if (currentInterval) {
-            const power = this.getIntervalPower(currentInterval);
+            const power = this.getIntervalPower(currentInterval, elapsedInInterval);
             const intensityPercent = Math.round(this.intensityScale * 100);
             const remaining = Math.max(0, currentInterval.duration - elapsedInInterval);
 
@@ -544,7 +601,7 @@ class WorkoutDesigner {
             // Show countdown when less than 10 seconds remaining
             const countdownEl = document.getElementById('currentIntervalCountdown');
             const countdownSecsEl = document.getElementById('countdownSeconds');
-            if (countdownEl && countdownSecsEl && remaining <= 10000 && remaining > 0) {
+            if (countdownEl && countdownSecsEl && remaining <= 10 && remaining > 0) {
                 countdownEl.style.display = 'block';
                 countdownSecsEl.textContent = Math.ceil(remaining) + 's';
             } else if (countdownEl) {
@@ -578,28 +635,17 @@ class WorkoutDesigner {
             if (!name) return;
         }
 
-        const workout = {
-            name,
-            ftp: this.ftp,
-            intervals: this.intervals.map(interval => ({
-                name: interval.name,
-                type: interval.type,
-                duration: interval.duration,
-                powerType: interval.powerType || 'relative',
-                ...(interval.powerType === 'absolute' ? { power: interval.power } : { percentage: interval.percentage })
-            })),
-            created: new Date().toISOString(),
-            version: '1.0'
-        };
+        const workout = { ...this.exportWorkoutData(), name };
+        if (!workout.intervals) return;
 
-        const workouts = this.getStoredWorkouts();
-        workouts[name] = workout;
+        const workouts = { ...this.getStoredWorkouts(), [name]: workout };
         localStorage.setItem('zwift_workouts', JSON.stringify(workouts));
 
         this.ftms.log(`Saved workout: ${name}`, 'success');
     }
 
     loadWorkout(name) {
+        if (this.isRunning) return;
         const workouts = this.getStoredWorkouts();
         const workout = workouts[name];
 
@@ -608,18 +654,12 @@ class WorkoutDesigner {
             return;
         }
 
-        // Normalize intervals to handle both old and new formats
-        this.intervals = workout.intervals.map(i => {
-            const powerType = i.powerType || (i.power !== undefined ? 'absolute' : 'relative');
-            return {
-                id: Date.now() + Math.random(),
-                name: i.name,
-                type: i.type,
-                duration: i.duration,
-                powerType: powerType,
-                ...(powerType === 'absolute' ? { power: i.power } : { percentage: i.percentage || 100 })
-            };
-        });
+        try {
+            this.intervals = WorkoutDesigner.normalizeIntervals(workout.intervals);
+        } catch (error) {
+            alert(`Cannot load workout: ${error.message}`);
+            return;
+        }
         
         if (workout.ftp) {
             this.ftp = workout.ftp;
@@ -658,29 +698,9 @@ class WorkoutDesigner {
         }
 
         const workout = {
+            ...this.exportWorkoutData(),
             name: prompt('Workout name:', 'My Workout') || 'Workout',
-            description: prompt('Workout description (optional):', '') || '',
-            ftp: this.ftp,
-            intervals: this.intervals.map(interval => {
-                // Create clean interval object without UI-specific fields
-                const cleanInterval = {
-                    name: interval.name,
-                    type: interval.type,
-                    duration: interval.duration,
-                    powerType: interval.powerType || 'relative'
-                };
-                
-                // Add power fields based on type
-                if (cleanInterval.powerType === 'absolute') {
-                    cleanInterval.power = interval.power;
-                } else {
-                    cleanInterval.percentage = interval.percentage;
-                }
-                
-                return cleanInterval;
-            }),
-            created: new Date().toISOString(),
-            version: '1.0'
+            description: prompt('Workout description (optional):', '') || ''
         };
 
         const dataStr = JSON.stringify(workout, null, 2);
@@ -701,72 +721,9 @@ class WorkoutDesigner {
             try {
                 const workout = JSON.parse(e.target.result);
 
-                // Validate workout structure
-                if (!workout.intervals || !Array.isArray(workout.intervals)) {
-                    throw new Error('Invalid workout format: missing or invalid intervals array');
-                }
-
-                // Validate and normalize each interval
-                const validIntervals = workout.intervals.map((interval, index) => {
-                    // Check required fields
-                    if (!interval.duration || typeof interval.duration !== 'number') {
-                        throw new Error(`Interval ${index + 1}: missing or invalid duration`);
-                    }
-                    
-                    // Determine power type and validate
-                    const powerType = interval.powerType || (interval.power !== undefined ? 'absolute' : 'relative');
-
-                    if (powerType === 'ramp') {
-                        if (typeof interval.percentageLow !== 'number' || typeof interval.percentageHigh !== 'number') {
-                            throw new Error(`Interval ${index + 1}: ramp intervals require percentageLow and percentageHigh values`);
-                        }
-                    } else if (powerType === 'absolute') {
-                        if (!interval.power || typeof interval.power !== 'number') {
-                            throw new Error(`Interval ${index + 1}: missing or invalid power value for absolute power type`);
-                        }
-                    } else {
-                        if (!interval.percentage || typeof interval.percentage !== 'number') {
-                            throw new Error(`Interval ${index + 1}: missing or invalid percentage value for relative power type`);
-                        }
-                    }
-
-                    // Normalize interval with defaults
-                    const normalized = {
-                        id: Date.now() + Math.random(),
-                        name: interval.name || `Interval ${index + 1}`,
-                        type: interval.type || 'custom',
-                        duration: interval.duration,
-                        powerType: powerType
-                    };
-
-                    if (powerType === 'ramp') {
-                        normalized.percentageLow = interval.percentageLow;
-                        normalized.percentageHigh = interval.percentageHigh;
-                    } else if (powerType === 'absolute') {
-                        normalized.power = interval.power;
-                    } else {
-                        normalized.percentage = interval.percentage;
-                    }
-
-                    return normalized;
-                });
-
-                this.intervals = validIntervals;
-                
-                // Update FTP if provided
-                if (workout.ftp && typeof workout.ftp === 'number') {
-                    this.ftp = workout.ftp;
-                    document.getElementById('ftpInput').value = this.ftp;
-                }
-
-                this.render();
-                this.updateWorkoutInfo();
-                
-                // Auto-save imported workout to library
-                const workoutName = workout.name || 'Imported Workout';
-                this.saveWorkout(workoutName);
-                
-                this.ftms.log(`✓ Imported workout: ${workoutName} (${validIntervals.length} intervals)`, 'success');
+                const workoutName = workout?.name || 'Imported Workout';
+                this.importWorkoutData({ ...workout, name: workoutName });
+                this.ftms.log(`✓ Imported workout: ${workoutName} (${this.intervals.length} intervals)`, 'success');
                 
                 // Refresh workout library and switch to Workouts tab to show the imported workout
                 if (window.app) {
@@ -831,6 +788,7 @@ class WorkoutDesigner {
 
     // Import workout data directly (for ZWO import)
     importWorkoutData(workout) {
+        if (this.isRunning) throw new Error('Stop the workout before importing another one');
         // Validate workout structure
         if (!workout || typeof workout !== 'object') {
             console.error('Invalid workout object:', workout);
@@ -841,47 +799,10 @@ class WorkoutDesigner {
             throw new Error('Invalid workout format: missing or invalid intervals array');
         }
 
-        // Validate and normalize each interval
-        const validIntervals = workout.intervals.map((interval, index) => {
-            if (!interval.duration || typeof interval.duration !== 'number') {
-                throw new Error(`Interval ${index + 1}: missing or invalid duration`);
-            }
-
-            const powerType = interval.powerType || (interval.power !== undefined ? 'absolute' : 'relative');
-
-            if (powerType === 'ramp') {
-                if (typeof interval.percentageLow !== 'number' || typeof interval.percentageHigh !== 'number') {
-                    throw new Error(`Interval ${index + 1}: ramp intervals require percentageLow and percentageHigh values`);
-                }
-            } else if (powerType === 'absolute') {
-                if (!interval.power || typeof interval.power !== 'number') {
-                    throw new Error(`Interval ${index + 1}: missing or invalid power value`);
-                }
-            } else {
-                if (!interval.percentage || typeof interval.percentage !== 'number') {
-                    throw new Error(`Interval ${index + 1}: missing or invalid percentage value`);
-                }
-            }
-
-            const normalized = {
-                id: Date.now() + Math.random(),
-                name: interval.name || `Interval ${index + 1}`,
-                type: interval.type || 'custom',
-                duration: interval.duration,
-                powerType: powerType
-            };
-
-            if (powerType === 'ramp') {
-                normalized.percentageLow = interval.percentageLow;
-                normalized.percentageHigh = interval.percentageHigh;
-            } else if (powerType === 'absolute') {
-                normalized.power = interval.power;
-            } else {
-                normalized.percentage = interval.percentage;
-            }
-
-            return normalized;
-        });
+        const validIntervals = WorkoutDesigner.normalizeIntervals(workout.intervals);
+        if (workout.ftp !== undefined && (!Number.isFinite(workout.ftp) || workout.ftp < 50 || workout.ftp > 500)) {
+            throw new Error('FTP must be between 50 and 500 watts');
+        }
 
         this.intervals = validIntervals;
 
@@ -894,7 +815,7 @@ class WorkoutDesigner {
         this.updateWorkoutInfo();
 
         // Auto-save if workout has a name
-        if (workout.name && workout.name !== 'Custom Workout') {
+        if (workout.name) {
             this.saveWorkout(workout.name);
 
             if (window.app) {
