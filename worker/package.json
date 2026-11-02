@@ -1,0 +1,24 @@
+{
+  "name": "cadence-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cadence: static frontend + accounts/rides API on one Cloudflare Worker (D1, Better Auth)",
+  "scripts": {
+    "build": "node scripts/build-assets.mjs",
+    "dev": "node scripts/ensure-dev-vars.mjs && npm run db:migrate:local && npm run build && wrangler dev",
+    "test": "node scripts/build-assets.mjs && vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "better-auth": "1.7.15"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.5.0",
+    "kysely": "0.29.8",
+    "vitest": "4.1.12",
+    "wrangler": "4.156.2"
+  }
+}

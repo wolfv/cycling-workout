@@ -1,0 +1,72 @@
+{
+  // Cadence: static frontend + /api/* on ONE Worker. Top level = local development.
+  // Production lives in "env.production" below (deploy with `wrangler deploy --env production`)
+  // so that dev defaults (console e-mail, Turnstile test keys) can never reach production by accident.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cadence-dev",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The Worker runs first for every request: it handles /api/* and adds the security
+  // headers to everything served from ./dist (built by scripts/build-assets.mjs).
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      // Placeholder: only used for local development (wrangler dev / vitest use a local SQLite file).
+      // Real ID: see worker/README.md, section "One-time Cloudflare setup".
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "cadence-dev",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Dev defaults. Secrets (BETTER_AUTH_SECRET, TURNSTILE_SECRET_KEY, RESEND_API_KEY) are NOT here:
+  // locally they come from worker/.dev.vars (created from .dev.vars.example), in production from `wrangler secret put`.
+  "vars": {
+    "BASE_URL": "http://localhost:8787",
+    "TRUSTED_ORIGINS": "",
+    "EMAIL_MODE": "console",
+    "EMAIL_FROM": "Cadence <noreply@example.com>",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+    "APP_VERSION": "dev"
+  },
+
+  "env": {
+    "production": {
+      "name": "cadence",
+      "compatibility_date": "2025-09-01",
+      "compatibility_flags": ["nodejs_compat"],
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "run_worker_first": true
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          // TODO(Wolf): replace with the ID printed by `wrangler d1 create cadence --jurisdiction eu`.
+          "database_id": "REPLACE_WITH_PRODUCTION_D1_ID",
+          "database_name": "cadence",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "vars": {
+        // TODO(Wolf): the public origin of the deployed app (no trailing slash).
+        "BASE_URL": "https://cadence.REPLACE_ME.workers.dev",
+        "TRUSTED_ORIGINS": "",
+        "EMAIL_MODE": "resend",
+        "EMAIL_FROM": "Cadence <noreply@REPLACE_ME>",
+        // TODO(Wolf): real Turnstile site key (the matching secret goes in as TURNSTILE_SECRET_KEY).
+        "TURNSTILE_SITE_KEY": "REPLACE_ME",
+        "APP_VERSION": "prod"
+      }
+    }
+  }
+}

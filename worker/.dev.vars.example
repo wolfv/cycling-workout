@@ -1,0 +1,4 @@
+# Copy to .dev.vars (done automatically by `npm run dev`). Local development only; never commit .dev.vars.
+BETTER_AUTH_SECRET=dev-only-secret-change-me-0123456789abcdef0123456789abcdef
+# Cloudflare Turnstile "always passes" test secret (pairs with site key 1x00000000000000000000AA)
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
