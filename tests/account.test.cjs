@@ -63,7 +63,7 @@ function harness(routes = () => ({ status: 404 })) {
         globalThis.AccountManager = AccountManager; globalThis.RideQueue = RideQueue; globalThis.ApiError = ApiError;
         globalThis.describeError = describeError;`);
     load(`${withoutBootstrap('history.js')}
-        globalThis.RideHistory = RideHistory; globalThis.reduceSamples = reduceSamples; globalThis.formatRide = formatRide;`);
+        globalThis.RideHistory = RideHistory; globalThis.reduceSamples = reduceSamples; globalThis.formatRide = formatRide; globalThis.timeTicks = timeTicks; globalThis.formatTick = formatTick;`);
 
     const fetch = async (path, init = {}) => {
         const call = { method: init.method || 'GET', path, headers: init.headers || {}, body: init.body ? JSON.parse(init.body) : undefined };
@@ -588,4 +588,16 @@ test('ride history loads stats and pages, and deleting a ride refreshes the tota
     assert.deepEqual(Array.from(state.rides.map(item => item.id)), ['b', 'c']);
     assert.equal(state.selected, null);
     assert.equal(h.calls.filter(call => call.path === '/api/stats').length, 2);
+});
+
+test('time axis ticks sit at exact multiples of a round interval chosen by width', () => {
+    const h = harness();
+    const ticks = (duration, width) => Array.from(h.context.timeTicks(duration, width));
+    assert.deepEqual(ticks(1200, 1100), [0, 120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200]);
+    assert.deepEqual(ticks(1200, 300), [0, 300, 600, 900, 1200]);
+    assert.ok(ticks(1200, 1100).includes(300) === false && ticks(1200, 300).includes(300));
+    assert.deepEqual(ticks(3 * 3600, 600), [0, 1800, 3600, 5400, 7200, 9000, 10800]);
+    assert.equal(h.context.formatTick(900), '15:00');
+    assert.equal(h.context.formatTick(5400), '1:30:00');
+    assert.match(h.context.formatRide({ id: 'r', startedAt: '2026-11-02T07:30:00.000Z', durationS: 60 }).dateLabel, /^Mon,? 2 Nov(ember)? 2026$/);
 });

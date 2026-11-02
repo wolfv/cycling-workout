@@ -20,6 +20,21 @@ function formatClock(seconds) {
         : `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+// Tick positions (seconds) at exact multiples of a round interval, as many as fit in the width.
+const TICK_MINUTES = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720];
+function timeTicks(duration, width, minSpacing = 64) {
+    const maxTicks = Math.max(2, Math.floor(width / minSpacing));
+    const step = (TICK_MINUTES.find(minutes => duration / (minutes * 60) <= maxTicks) || 720) * 60;
+    const ticks = [];
+    for (let t = 0; t <= duration; t += step) ticks.push(t);
+    return ticks;
+}
+
+// Exact tick label: m:ss under an hour, h:mm:ss otherwise.
+function formatTick(seconds) {
+    return formatClock(seconds);
+}
+
 // "2h 05m" for tiles.
 function formatTotalTime(seconds) {
     const minutes = Math.round(Math.max(0, seconds) / 60);
@@ -41,8 +56,8 @@ function formatRide(ride) {
     return {
         id: ride.id,
         workoutName: ride.workoutName || 'Ride',
-        dateLabel: started.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
-        timeLabel: started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+        dateLabel: started.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
+        timeLabel: started.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
         durationLabel: formatClock(ride.durationS),
         powerLabel: `${formatOptional(ride.avgPower)} / ${formatOptional(ride.np)} W`,
         hrLabel: formatOptional(ride.avgHr, ' bpm'),
@@ -153,7 +168,7 @@ function drawWeeklyChart(canvas, weeks) {
             ctx.fillStyle = HISTORY_COLORS.text;
             ctx.textAlign = 'center';
             const label = new Date(`${week.weekStart}T00:00:00Z`)
-                .toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+                .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
             ctx.fillText(label, x + barWidth / 2, height - 8);
         }
     });
@@ -172,10 +187,10 @@ function drawRideChart(canvas, samples) {
     const points = reduceSamples(samples, Math.max(2, Math.floor(plotWidth)));
     const duration = Math.max(1, samples[samples.length - 1][0]);
     const maxPower = Math.max(100, Math.ceil(Math.max(...points.map(p => p[1])) / 50) * 50);
-    const hrValues = points.map(p => p[2]).filter(value => value > 0);
-    const hrMax = hrValues.length ? Math.max(...hrValues) + 10 : 0;
-    const hrMin = hrValues.length ? Math.max(0, Math.min(...hrValues) - 10) : 0;
-    const maxCadence = Math.max(120, ...points.map(p => p[3]));
+    const hasHr = points.some(p => p[2] > 0);
+    const hasCadence = points.some(p => p[3] > 0);
+    // Heart rate and cadence share the right axis (bpm / rpm).
+    const rightMax = Math.max(40, Math.ceil(Math.max(...points.map(p => Math.max(p[2], p[3]))) / 40) * 40);
     const x = t => pad.left + (t / duration) * plotWidth;
     const bottom = pad.top + plotHeight;
 
@@ -191,16 +206,18 @@ function drawRideChart(canvas, samples) {
         ctx.stroke();
         ctx.textAlign = 'right';
         ctx.fillText(`${Math.round((maxPower / 4) * (4 - i))}`, pad.left - 6, y + 4);
-        if (hrMax) {
+        if (hasHr || hasCadence) {
             ctx.textAlign = 'left';
-            ctx.fillText(`${Math.round(hrMin + ((hrMax - hrMin) / 4) * (4 - i))}`, pad.left + plotWidth + 6, y + 4);
+            ctx.fillText(`${Math.round((rightMax / 4) * (4 - i))}`, pad.left + plotWidth + 6, y + 4);
         }
     }
+    ctx.textAlign = 'left';
+    if (hasHr || hasCadence) ctx.fillText('bpm / rpm', pad.left + plotWidth - 20, 10);
+    ctx.fillText('W', 4, 10);
     ctx.textAlign = 'center';
-    for (let i = 0; i <= 4; i++) {
-        const seconds = (duration / 4) * i;
-        ctx.textAlign = i === 0 ? 'left' : i === 4 ? 'right' : 'center';
-        ctx.fillText(formatClock(seconds - (seconds % 60)), pad.left + (plotWidth / 4) * i, height - 8);
+    for (const t of timeTicks(duration, plotWidth)) {
+        ctx.textAlign = t === 0 ? 'left' : 'center';
+        ctx.fillText(formatTick(t), x(t), height - 8);
     }
 
     const line = (index, scale, color, lineWidth) => {
@@ -218,8 +235,9 @@ function drawRideChart(canvas, samples) {
         }
         ctx.stroke();
     };
-    line(3, value => bottom - (value / maxCadence) * plotHeight, HISTORY_COLORS.cadence, 1);
-    if (hrMax) line(2, value => bottom - ((value - hrMin) / (hrMax - hrMin)) * plotHeight, HISTORY_COLORS.hr, 1.5);
+    const rightY = value => bottom - (value / rightMax) * plotHeight;
+    line(3, rightY, HISTORY_COLORS.cadence, 1);
+    line(2, rightY, HISTORY_COLORS.hr, 1.5);
 
     ctx.beginPath();
     ctx.moveTo(x(points[0][0]), bottom);
