@@ -18,9 +18,16 @@ const AxeBuilder = require('@axe-core/playwright').default;
             violations.push(...results.violations.map(item => ({ location, id: item.id, nodes: item.nodes.map(node => node.target) })));
         };
         page.on('pageerror', error => errors.push(error.message));
-        page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+        // Static hosts have no API, so the account probe answers 404; that is the expected "no backend" case.
+        page.on('console', message => {
+            if (message.type() === 'error' && !message.location().url.endsWith('/api/health')) errors.push(message.text());
+        });
         await page.goto(process.env.APP_URL || 'http://localhost:8000', { waitUntil: 'networkidle' });
         assert.equal(await page.locator('#nav-ride').getAttribute('aria-current'), 'page');
+        // Without the backend every account element stays hidden; with it, the account button is offered.
+        const accountAvailable = await page.evaluate(() => Alpine.store('app').account.available);
+        assert.equal(await page.locator('#accountButton').isVisible(), accountAvailable);
+        assert.equal(await page.locator('#nav-history').isVisible(), false);
         await page.screenshot({ path: '/tmp/cadence-desktop.png', fullPage: true });
 
         await page.locator('#nav-design').click();
