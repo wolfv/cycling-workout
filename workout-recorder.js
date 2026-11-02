@@ -84,6 +84,39 @@ class WorkoutRecorder {
         };
     }
 
+    // Reduce the recording to 1 Hz for upload: the last reading per whole second,
+    // as [elapsedSeconds, power, heartRate, cadence] integers (see docs/api.md).
+    getUploadSamples(maxSamples = 43200) {
+        const clamp = (value, max) => Math.min(max, Math.max(0, Math.round(Number(value) || 0)));
+        const samples = [];
+        for (const point of this.dataPoints) {
+            const second = Math.max(0, Math.floor(point.elapsedSeconds));
+            const sample = [second, clamp(point.power, 3000), clamp(point.heartRate, 250), clamp(point.cadence, 250)];
+            if (samples.length > 0 && samples[samples.length - 1][0] === second) {
+                samples[samples.length - 1] = sample;
+            } else if (samples.length === 0 || second > samples[samples.length - 1][0]) {
+                samples.push(sample);
+            }
+        }
+        return samples.slice(0, maxSamples);
+    }
+
+    // Build the POST /api/rides body. Statistics are not sent; the server computes them.
+    buildRidePayload({ ftp = null, groupSession = false, id = null } = {}) {
+        const samples = this.getUploadSamples();
+        if (samples.length === 0 || !this.startTime) return null;
+        const roundedFtp = Math.round(Number(ftp));
+        const validFtp = roundedFtp >= 50 && roundedFtp <= 500 ? roundedFtp : null;
+        return {
+            id: id || crypto.randomUUID(),
+            startedAt: this.startTime.toISOString(),
+            workoutName: String(this.workoutName || 'Indoor Cycling').slice(0, 100),
+            ftp: validFtp,
+            groupSession: Boolean(groupSession),
+            samples
+        };
+    }
+
     // Export to TCX format (Training Center XML)
     // Compatible with: Strava, Garmin Connect, TrainingPeaks, etc.
     exportTCX() {
