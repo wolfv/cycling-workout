@@ -134,6 +134,7 @@ class App {
     saveRiderName(name) {
         if (name && name.trim()) {
             localStorage.setItem('riderName', name.trim());
+            if (window.accountManager) window.accountManager.pushProfile({ riderName: name });
         }
     }
 
@@ -185,6 +186,11 @@ class App {
     }
 
     switchTab(tab) {
+        // The history tab only exists for signed-in riders.
+        if (tab === 'history' && !(window.accountManager && window.accountManager.isSignedIn())) {
+            tab = 'ride';
+        }
+
         // Update sidebar navigation links
         document.querySelectorAll('.app-nav a').forEach(link => {
             link.classList.remove('active');
@@ -210,6 +216,10 @@ class App {
         // Refresh workout library when switching to workouts tab
         if (tab === 'workouts') {
             this.refreshWorkoutLibrary();
+        }
+
+        if (tab === 'history' && window.rideHistory) {
+            window.rideHistory.onShow();
         }
 
         // Re-initialize Lucide icons after DOM update
@@ -357,6 +367,8 @@ class App {
             }
         }, 10);
 
+        if (window.accountManager) window.accountManager.setSaveStatus('');
+
         // Start recording workout
         const workoutName = window.workoutDesigner.name;
         this.workoutRecorder.start(workoutName);
@@ -379,6 +391,7 @@ class App {
 
         // Show workout summary if we have data
         if (dataPoints > 0) {
+            this.saveRideToAccount();
             this.showWorkoutSummary();
         } else {
             // Show workout control card again if we have intervals
@@ -393,6 +406,22 @@ class App {
 
         // Re-initialize icons
         setTimeout(() => lucide.createIcons(), 0);
+    }
+
+    // Hand the finished ride to the account backend. Does nothing when that backend is not there.
+    saveRideToAccount() {
+        if (!window.accountManager) return;
+        try {
+            const payload = this.workoutRecorder.buildRidePayload({
+                ftp: window.workoutDesigner.ftp,
+                groupSession: Boolean(this.sessionManager && this.sessionManager.sessionId)
+            });
+            if (payload) {
+                window.accountManager.saveRide(payload).catch(error => console.error('Ride upload failed:', error));
+            }
+        } catch (error) {
+            console.error('Could not prepare the ride for upload:', error);
+        }
     }
 
     showWorkoutSummary() {
@@ -487,6 +516,7 @@ class App {
         if (!isNaN(ftp) && ftp >= 50 && ftp <= 500) {
             window.workoutDesigner.setFTP(ftp);
             this.log(`FTP updated to ${ftp}W`, 'info');
+            if (window.accountManager) window.accountManager.pushProfile({ ftp });
         }
     }
 
@@ -1286,6 +1316,7 @@ class App {
 
         // Update local FTP
         window.workoutDesigner.setFTP(ftp);
+        if (window.accountManager) window.accountManager.pushProfile({ ftp });
 
         // Broadcast to all session participants
         if (this.sessionManager && this.sessionManager.sessionId) {

@@ -1841,3 +1841,259 @@ details[open] .chevron-rotate {
     scroll-behavior: auto !important;
   }
 }
+
+/* Accounts and ride history. Hidden entirely unless the backend answers /api/health. */
+.account-button span {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.form-notice {
+  color: var(--primary);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.app-dialog .form-error {
+  margin-bottom: 12px;
+}
+.app-dialog .stack > .help-text,
+.app-dialog .stack > p {
+  margin: 0;
+}
+.dialog-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 12px;
+}
+.text-link:disabled {
+  text-decoration: none;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.check-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.code-input {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 6px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.captcha-box:empty {
+  display: none;
+}
+.account-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.account-id strong,
+.account-id span {
+  overflow-wrap: anywhere;
+}
+.account-id span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.save-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--primary);
+}
+.save-status.save-queued,
+.save-status.save-login,
+.save-status.save-saving {
+  color: var(--muted-foreground);
+}
+.save-status.save-error {
+  color: #f2a2a8;
+}
+
+.history-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.history-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 4px;
+}
+.history-figures dt {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.history-figures dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.history-chart-card,
+.history-tiles + .card,
+.history-chart-card + .card {
+  margin-bottom: 24px;
+}
+.history-chart {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border-radius: 8px;
+}
+.history-chart-tall {
+  height: 280px;
+}
+.history-empty {
+  border: 0;
+  padding: 36px 8px;
+}
+.ride-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ride-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.1fr) minmax(0, 1.6fr) repeat(4, minmax(72px, 0.7fr));
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+}
+.ride-row:hover {
+  background: var(--muted);
+}
+.ride-when,
+.ride-figure {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ride-when small,
+.ride-figure small {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.ride-when strong {
+  font-weight: 500;
+  font-size: 12px;
+}
+.ride-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ride-figure b {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ride-more {
+  justify-content: center;
+  margin-top: 16px;
+}
+.history-back {
+  margin: 0 0 14px -8px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  list-style: none;
+  margin: 10px 0 22px;
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+.swatch-power {
+  background: #c3ef73;
+}
+.swatch-hr {
+  background: #f2a2a8;
+}
+.swatch-cadence {
+  background: #7dd3fc;
+}
+.delete-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .history-tiles {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .account-button span {
+    display: none;
+  }
+  .account-button {
+    padding: 8px;
+  }
+  .ride-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 10px;
+  }
+  .ride-when {
+    grid-column: 1 / 3;
+  }
+  .ride-name {
+    grid-column: 3 / 5;
+    text-align: right;
+  }
+  .history-chart {
+    height: 150px;
+  }
+  .history-chart-tall {
+    height: 220px;
+  }
+}
+@media (max-width: 420px) {
+  .history-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ride-figure b {
+    font-size: 12px;
+  }
+}

@@ -70,6 +70,54 @@ document.addEventListener('alpine:init', () => {
             targetPower: 0
         },
 
+        // Account state (account.js). `available` stays false without the /api backend, which hides every account element.
+        account: {
+            available: false,
+            loading: false,
+            user: null,
+            profile: null,
+            saveStatus: '', // '', 'saving', 'saved', 'queued', 'login' or 'error' for the last ride
+            saveMessage: '',
+            ui: {
+                view: 'signin', // signin, code, signup, verify, forgot, reset, menu, delete
+                busy: false,
+                error: '',
+                notice: '',
+                cooldown: 0,
+                pendingEmail: '',
+                resetToken: '',
+                form: {
+                    name: '',
+                    email: '',
+                    password: '',
+                    code: '',
+                    trustDevice: true,
+                    newPassword: '',
+                    riderName: '',
+                    ftp: '',
+                    hrConsent: false,
+                    deletePassword: '',
+                    deleteConfirm: false
+                }
+            }
+        },
+
+        // Ride history state (history.js). Raw samples stay outside the store.
+        rideHistory: {
+            loaded: false,
+            loading: false,
+            loadingMore: false,
+            error: '',
+            rides: [],
+            nextCursor: null,
+            stats: null,
+            selected: null,
+            detailLoading: false,
+            confirmingDelete: false,
+            weeklySummary: '',
+            rideSummary: ''
+        },
+
         // Methods
         setConnected(connected, deviceName = null) {
             this.connected = connected;
@@ -178,6 +226,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         // Computed properties
+        get signedIn() {
+            return this.account.available && Boolean(this.account.user);
+        },
+
+        get accountLabel() {
+            const { user, profile } = this.account;
+            return user ? (profile && profile.riderName) || user.name || 'Account' : 'Sign in';
+        },
+
         get connectionStatus() {
             if (this.connecting) return 'Connecting...';
             if (this.connected) return 'Connected';

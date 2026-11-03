@@ -27,6 +27,8 @@
         <script defer src="session-p2p.js"></script>
         <script defer src="racetrack.js"></script>
         <script defer src="zwo-converter.js"></script>
+        <script defer src="account.js"></script>
+        <script defer src="history.js"></script>
         <script defer src="app.js"></script>
     </head>
     <body x-data="{}">
@@ -88,6 +90,18 @@
                     "
                     ><i data-lucide="users"></i><span>Group ride</span><span class="nav-key">04</span></a
                 >
+                <a
+                    href="#history"
+                    id="nav-history"
+                    data-tab="history"
+                    x-show="$store.app.signedIn"
+                    x-cloak
+                    onclick="
+                        app.switchTab('history');
+                        return false;
+                    "
+                    ><i data-lucide="history"></i><span>History</span><span class="nav-key">05</span></a
+                >
             </nav>
             <div class="sidebar-bottom">
                 <div class="sidebar-note">
@@ -114,6 +128,17 @@
                     >
                 </div>
                 <div class="button-row">
+                    <button
+                        class="btn-ghost account-button"
+                        id="accountButton"
+                        x-show="$store.app.account.available"
+                        x-cloak
+                        :aria-label="$store.app.signedIn ? 'Account: ' + $store.app.accountLabel : 'Sign in or create an account'"
+                        aria-haspopup="dialog"
+                        onclick="accountManager.openDialog()"
+                    >
+                        <i data-lucide="user"></i><span x-text="$store.app.accountLabel">Sign in</span>
+                    </button>
                     <button
                         class="btn-ghost device-button"
                         onclick="document.getElementById('devicesDialog').showModal()"
@@ -344,6 +369,25 @@
                                             Dismiss
                                         </button>
                                     </div>
+                                    <p
+                                        class="save-status"
+                                        :class="'save-' + $store.app.account.saveStatus"
+                                        role="status"
+                                        x-show="$store.app.account.available && $store.app.account.saveStatus"
+                                        x-cloak
+                                    >
+                                        <span
+                                            x-show="$store.app.account.saveStatus !== 'login'"
+                                            x-text="$store.app.account.saveMessage"
+                                        ></span>
+                                        <button
+                                            type="button"
+                                            class="text-link"
+                                            x-show="$store.app.account.saveStatus === 'login'"
+                                            x-text="$store.app.account.saveMessage"
+                                            onclick="accountManager.openDialog('signin')"
+                                        ></button>
+                                    </p>
                                     <p class="help-text">
                                         Download before closing this tab. Upload your TCX to
                                         <a
@@ -859,6 +903,213 @@ Duration is in seconds. Use powerType "relative" with percentage, "absolute" wit
                         </div>
                     </div>
                 </section>
+                <section
+                    class="tab-content"
+                    id="content-history"
+                    aria-labelledby="history-heading"
+                    x-data="{
+                        get h() { return Alpine.store('app').rideHistory; },
+                        get week() { return Alpine.store('app').rideHistory.stats ? Alpine.store('app').rideHistory.stats.week : { rides: '—', time: '—', kj: '—', tss: '—' }; },
+                        get month() { return Alpine.store('app').rideHistory.stats ? Alpine.store('app').rideHistory.stats.month : { rides: '—', time: '—', kj: '—', tss: '—' }; }
+                    }"
+                >
+                    <div class="page-heading">
+                        <div>
+                            <div class="eyebrow">EVERY RIDE COUNTS</div>
+                            <h1 id="history-heading">Your ride history<span class="accent">.</span></h1>
+                            <p>Saved to your account. Ready on any device.</p>
+                        </div>
+                    </div>
+                    <p class="form-error" role="alert" x-text="h.error"></p>
+
+                    <div x-show="!h.selected">
+                        <div class="history-tiles">
+                            <article class="metric history-tile">
+                                <div class="metric-label"><i data-lucide="calendar-days"></i> This week</div>
+                                <dl class="history-figures">
+                                    <div><dt>Rides</dt><dd x-text="week.rides">—</dd></div>
+                                    <div><dt>Time</dt><dd x-text="week.time">—</dd></div>
+                                    <div><dt>Work</dt><dd><span x-text="week.kj">—</span> kJ</dd></div>
+                                    <div><dt>TSS</dt><dd x-text="week.tss">—</dd></div>
+                                </dl>
+                            </article>
+                            <article class="metric history-tile">
+                                <div class="metric-label"><i data-lucide="calendar-range"></i> This month</div>
+                                <dl class="history-figures">
+                                    <div><dt>Rides</dt><dd x-text="month.rides">—</dd></div>
+                                    <div><dt>Time</dt><dd x-text="month.time">—</dd></div>
+                                    <div><dt>Work</dt><dd><span x-text="month.kj">—</span> kJ</dd></div>
+                                    <div><dt>TSS</dt><dd x-text="month.tss">—</dd></div>
+                                </dl>
+                            </article>
+                        </div>
+
+                        <article class="card history-chart-card" x-show="h.stats">
+                            <header class="panel-heading">
+                                <div>
+                                    <h2>Training time</h2>
+                                    <p>Hours per week, last 12 weeks.</p>
+                                </div>
+                            </header>
+                            <section>
+                                <canvas
+                                    id="weeklyChart"
+                                    class="history-chart"
+                                    role="img"
+                                    :aria-label="h.weeklySummary || 'Training time per week'"
+                                ></canvas>
+                            </section>
+                        </article>
+
+                        <article class="card">
+                            <header class="panel-heading">
+                                <h2>Rides</h2>
+                                <span
+                                    class="count-badge"
+                                    x-show="h.rides.length"
+                                    x-text="h.rides.length + (h.nextCursor ? '+' : '')"
+                                ></span>
+                            </header>
+                            <section>
+                                <p class="help-text" role="status" x-show="h.loading && !h.rides.length">
+                                    Loading your rides…
+                                </p>
+                                <div
+                                    class="library-empty history-empty"
+                                    x-show="h.loaded && !h.loading && !h.rides.length"
+                                >
+                                    <i data-lucide="route"></i>
+                                    <h2>No rides yet.</h2>
+                                    <p>Finish a workout while you're signed in and it shows up here by itself.</p>
+                                    <button class="btn" onclick="app.switchTab('workouts')">
+                                        Pick a workout <i data-lucide="arrow-right"></i>
+                                    </button>
+                                </div>
+                                <ul class="ride-list" x-show="h.rides.length" aria-label="Your rides, newest first">
+                                    <template x-for="ride in h.rides" :key="ride.id">
+                                        <li>
+                                            <button
+                                                type="button"
+                                                class="ride-row"
+                                                :data-ride-id="ride.id"
+                                                :aria-label="'Open ' + ride.workoutName + ', ' + ride.dateLabel"
+                                                @click="rideHistory.open(ride.id)"
+                                            >
+                                                <span class="ride-when">
+                                                    <strong x-text="ride.dateLabel"></strong>
+                                                    <small x-text="ride.timeLabel"></small>
+                                                </span>
+                                                <span class="ride-name" x-text="ride.workoutName"></span>
+                                                <span class="ride-figure"
+                                                    ><small>Time</small><b x-text="ride.durationLabel"></b
+                                                ></span>
+                                                <span class="ride-figure"
+                                                    ><small>Avg / NP</small><b x-text="ride.powerLabel"></b
+                                                ></span>
+                                                <span class="ride-figure"
+                                                    ><small>Avg HR</small><b x-text="ride.hrLabel"></b
+                                                ></span>
+                                                <span class="ride-figure"
+                                                    ><small>TSS</small><b x-text="ride.tssLabel"></b
+                                                ></span>
+                                            </button>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <div class="button-row ride-more" x-show="h.nextCursor">
+                                    <button
+                                        class="btn-outline"
+                                        :disabled="h.loadingMore"
+                                        onclick="rideHistory.loadMore()"
+                                        x-text="h.loadingMore ? 'Loading…' : 'Load more'"
+                                    >
+                                        Load more
+                                    </button>
+                                </div>
+                            </section>
+                        </article>
+                    </div>
+
+                    <div x-show="h.selected" x-cloak>
+                        <p class="history-back">
+                            <button type="button" class="btn-ghost" onclick="rideHistory.closeDetail()">
+                                <i data-lucide="arrow-left"></i> All rides
+                            </button>
+                        </p>
+                        <article class="card">
+                            <header class="panel-heading">
+                                <div>
+                                    <div
+                                        class="eyebrow"
+                                        x-text="h.selected ? h.selected.dateLabel + ' · ' + h.selected.timeLabel : ''"
+                                    ></div>
+                                    <h2
+                                        id="rideDetailHeading"
+                                        tabindex="-1"
+                                        x-text="h.selected ? h.selected.workoutName : ''"
+                                    ></h2>
+                                </div>
+                                <span class="count-badge" x-show="h.selected && h.selected.groupSession"
+                                    >GROUP RIDE</span
+                                >
+                            </header>
+                            <section>
+                                <p class="help-text" role="status" x-show="h.detailLoading">Loading ride…</p>
+                                <div class="summary-grid">
+                                    <template
+                                        x-for="figure in (h.selected ? h.selected.figures : [])"
+                                        :key="figure.label"
+                                    >
+                                        <div><span x-text="figure.label"></span><strong x-text="figure.value"></strong></div>
+                                    </template>
+                                </div>
+                                <canvas
+                                    id="rideChart"
+                                    class="history-chart history-chart-tall"
+                                    role="img"
+                                    :aria-label="h.rideSummary || 'Power, heart rate and cadence over time'"
+                                ></canvas>
+                                <ul class="chart-legend" aria-hidden="true">
+                                    <li><span class="swatch swatch-power"></span> Power (W)</li>
+                                    <li><span class="swatch swatch-hr"></span> Heart rate (bpm)</li>
+                                    <li><span class="swatch swatch-cadence"></span> Cadence (rpm)</li>
+                                </ul>
+                                <div class="button-row">
+                                    <button class="btn" onclick="rideHistory.downloadTcx()">
+                                        <i data-lucide="download"></i> Download TCX
+                                    </button>
+                                    <button
+                                        class="btn-destructive"
+                                        x-show="!h.confirmingDelete"
+                                        onclick="rideHistory.requestDelete()"
+                                    >
+                                        <i data-lucide="trash-2"></i> Delete
+                                    </button>
+                                    <div
+                                        class="delete-confirm"
+                                        role="group"
+                                        aria-label="Confirm deleting this ride"
+                                        x-show="h.confirmingDelete"
+                                        x-cloak
+                                        @keydown.escape.stop="rideHistory.cancelDelete()"
+                                    >
+                                        <span>Delete this ride for good?</span>
+                                        <button
+                                            id="confirmDeleteRide"
+                                            class="btn-destructive"
+                                            onclick="rideHistory.confirmDelete()"
+                                        >
+                                            Yes, delete
+                                        </button>
+                                        <button class="btn-outline" onclick="rideHistory.cancelDelete()">
+                                            Keep it
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+                        </article>
+                    </div>
+                </section>
                 <footer class="app-footer">
                     <span>Built for the ride. Not the subscription.</span
                     ><a href="https://github.com/wolfv/cycling-workout/issues" target="_blank" rel="noopener noreferrer"
@@ -999,6 +1250,361 @@ Duration is in seconds. Use powerType "relative" with percentage, "absolute" wit
                             Cancel</button
                         ><button class="btn" type="submit">Save interval <i data-lucide="check"></i></button>
                     </div>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog
+            id="accountDialog"
+            class="app-dialog"
+            aria-labelledby="account-title"
+            x-data="{
+                get a() { return Alpine.store('app').account; },
+                get ui() { return Alpine.store('app').account.ui; }
+            }"
+        >
+            <div class="dialog-heading">
+                <div>
+                    <div class="eyebrow">YOUR ACCOUNT</div>
+                    <h2
+                        id="account-title"
+                        x-text="{ signin: 'Welcome back.', code: 'Check your email.', signup: 'Create your account.', verify: 'One more step.', forgot: 'Reset your password.', reset: 'Choose a new password.', menu: 'Your account.', delete: 'Delete your account.' }[ui.view]"
+                    >
+                        Welcome back.
+                    </h2>
+                </div>
+                <button
+                    type="button"
+                    class="btn-ghost icon-button"
+                    onclick="accountManager.closeDialog()"
+                    aria-label="Close account"
+                >
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <p class="form-error" role="alert" x-text="ui.error"></p>
+            <p class="form-notice" role="status" x-show="ui.notice" x-text="ui.notice"></p>
+
+            <form
+                class="stack"
+                data-view="signin"
+                x-show="ui.view === 'signin'"
+                @submit.prevent="accountManager.signIn()"
+            >
+                <label for="signinEmail">Email</label>
+                <input
+                    class="input"
+                    id="signinEmail"
+                    type="email"
+                    autocomplete="username"
+                    maxlength="254"
+                    required
+                    data-autofocus
+                    x-model="ui.form.email"
+                />
+                <label for="signinPassword">Password</label>
+                <input
+                    class="input"
+                    id="signinPassword"
+                    type="password"
+                    autocomplete="current-password"
+                    maxlength="128"
+                    required
+                    x-model="ui.form.password"
+                />
+                <div class="captcha-box" data-captcha></div>
+                <button class="btn full-width" type="submit" :disabled="ui.busy">
+                    <span x-text="ui.busy ? 'Signing in…' : 'Continue'">Continue</span>
+                </button>
+                <div class="dialog-links">
+                    <button type="button" class="text-link" @click="accountManager.setView('forgot')">
+                        Forgot password?
+                    </button>
+                    <button type="button" class="text-link" @click="accountManager.setView('signup')">
+                        Create an account
+                    </button>
+                </div>
+            </form>
+
+            <form
+                class="stack"
+                data-view="code"
+                x-show="ui.view === 'code'"
+                x-cloak
+                @submit.prevent="accountManager.verifyCode()"
+            >
+                <p class="help-text">
+                    We emailed a 6-digit code to <strong x-text="ui.pendingEmail"></strong>. It is valid for 10
+                    minutes.
+                </p>
+                <label for="accountCode">6-digit code</label>
+                <input
+                    class="input code-input"
+                    id="accountCode"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxlength="6"
+                    required
+                    data-autofocus
+                    x-model="ui.form.code"
+                />
+                <label class="check-row">
+                    <input type="checkbox" x-model="ui.form.trustDevice" /> Trust this device for 30 days
+                </label>
+                <button class="btn full-width" type="submit" :disabled="ui.busy">
+                    <span x-text="ui.busy ? 'Checking…' : 'Sign in'">Sign in</span>
+                </button>
+                <div class="dialog-links">
+                    <button
+                        type="button"
+                        class="text-link"
+                        :disabled="ui.cooldown > 0 || ui.busy"
+                        @click="accountManager.resendCode()"
+                        x-text="ui.cooldown > 0 ? 'Resend code in ' + ui.cooldown + ' s' : 'Resend code'"
+                    >
+                        Resend code
+                    </button>
+                    <button type="button" class="text-link" @click="accountManager.setView('signin')">
+                        Use a different account
+                    </button>
+                </div>
+            </form>
+
+            <form
+                class="stack"
+                data-view="signup"
+                x-show="ui.view === 'signup'"
+                x-cloak
+                @submit.prevent="accountManager.signUp()"
+            >
+                <label for="signupName">Name</label>
+                <input
+                    class="input"
+                    id="signupName"
+                    type="text"
+                    autocomplete="name"
+                    maxlength="40"
+                    required
+                    data-autofocus
+                    x-model="ui.form.name"
+                />
+                <label for="signupEmail">Email</label>
+                <input
+                    class="input"
+                    id="signupEmail"
+                    type="email"
+                    autocomplete="email"
+                    maxlength="254"
+                    required
+                    x-model="ui.form.email"
+                />
+                <label for="signupPassword">Password</label>
+                <input
+                    class="input"
+                    id="signupPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="10"
+                    maxlength="128"
+                    aria-describedby="signupPasswordHint"
+                    required
+                    x-model="ui.form.password"
+                />
+                <p class="help-text" id="signupPasswordHint">At least 10 characters.</p>
+                <div class="captcha-box" data-captcha></div>
+                <button class="btn full-width" type="submit" :disabled="ui.busy">
+                    <span x-text="ui.busy ? 'Creating…' : 'Create account'">Create account</span>
+                </button>
+                <div class="dialog-links">
+                    <button type="button" class="text-link" @click="accountManager.setView('signin')">
+                        I already have an account
+                    </button>
+                </div>
+            </form>
+
+            <div class="stack" data-view="verify" x-show="ui.view === 'verify'" x-cloak>
+                <p>Check your inbox to verify your email.</p>
+                <p class="help-text">
+                    We sent a link to <strong x-text="ui.pendingEmail"></strong>. Open it, then sign in. Nothing there?
+                    Look in your spam folder or send the link again.
+                </p>
+                <button
+                    type="button"
+                    class="btn-outline full-width"
+                    :disabled="ui.cooldown > 0 || ui.busy"
+                    @click="accountManager.resendVerification()"
+                    x-text="ui.cooldown > 0 ? 'Resend email in ' + ui.cooldown + ' s' : 'Resend email'"
+                >
+                    Resend email
+                </button>
+                <button type="button" class="btn full-width" data-autofocus @click="accountManager.setView('signin')">
+                    Back to sign in
+                </button>
+            </div>
+
+            <form
+                class="stack"
+                data-view="forgot"
+                x-show="ui.view === 'forgot'"
+                x-cloak
+                @submit.prevent="accountManager.requestReset()"
+            >
+                <p class="help-text">Enter your email and we'll send you a link to choose a new password.</p>
+                <label for="forgotEmail">Email</label>
+                <input
+                    class="input"
+                    id="forgotEmail"
+                    type="email"
+                    autocomplete="username"
+                    maxlength="254"
+                    required
+                    data-autofocus
+                    x-model="ui.form.email"
+                />
+                <div class="captcha-box" data-captcha></div>
+                <button class="btn full-width" type="submit" :disabled="ui.busy">
+                    <span x-text="ui.busy ? 'Sending…' : 'Send reset link'">Send reset link</span>
+                </button>
+                <div class="dialog-links">
+                    <button type="button" class="text-link" @click="accountManager.setView('signin')">
+                        Back to sign in
+                    </button>
+                </div>
+            </form>
+
+            <form
+                class="stack"
+                data-view="reset"
+                x-show="ui.view === 'reset'"
+                x-cloak
+                @submit.prevent="accountManager.resetPassword()"
+            >
+                <label for="resetPassword">New password</label>
+                <input
+                    class="input"
+                    id="resetPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="10"
+                    maxlength="128"
+                    required
+                    data-autofocus
+                    x-model="ui.form.newPassword"
+                />
+                <p class="help-text">At least 10 characters. You'll be signed out on every device.</p>
+                <button class="btn full-width" type="submit" :disabled="ui.busy">
+                    <span x-text="ui.busy ? 'Saving…' : 'Save new password'">Save new password</span>
+                </button>
+            </form>
+
+            <div class="stack" data-view="menu" x-show="ui.view === 'menu'" x-cloak>
+                <div class="account-id">
+                    <strong x-text="a.user ? a.user.name : ''"></strong>
+                    <span x-text="a.user ? a.user.email : ''"></span>
+                </div>
+                <form class="stack" @submit.prevent="accountManager.saveProfile()">
+                    <label for="profileRiderName">Rider name</label>
+                    <input
+                        class="input"
+                        id="profileRiderName"
+                        type="text"
+                        autocomplete="nickname"
+                        maxlength="40"
+                        data-autofocus
+                        x-model="ui.form.riderName"
+                    />
+                    <label for="profileFtp">FTP (watts)</label>
+                    <input
+                        class="input"
+                        id="profileFtp"
+                        type="number"
+                        inputmode="numeric"
+                        min="50"
+                        max="500"
+                        x-model="ui.form.ftp"
+                    />
+                    <label class="check-row">
+                        <input type="checkbox" x-model="ui.form.hrConsent" /> Store my heart-rate data with my rides
+                    </label>
+                    <button class="btn full-width" type="submit" :disabled="ui.busy">Save profile</button>
+                </form>
+                <div class="divider"></div>
+                <div class="button-row">
+                    <button type="button" class="btn-outline" :disabled="ui.busy" @click="accountManager.exportData()">
+                        <i data-lucide="download"></i> Export my data
+                    </button>
+                    <button type="button" class="btn-outline" :disabled="ui.busy" @click="accountManager.signOut()">
+                        <i data-lucide="log-out"></i> Sign out
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-outline"
+                        :disabled="ui.busy"
+                        @click="accountManager.signOutEverywhere()"
+                    >
+                        Sign out everywhere
+                    </button>
+                </div>
+                <div class="divider"></div>
+                <button type="button" class="btn-destructive full-width" @click="accountManager.setView('delete')">
+                    <i data-lucide="trash-2"></i> Delete account…
+                </button>
+            </div>
+
+            <form
+                class="stack"
+                data-view="delete"
+                x-show="ui.view === 'delete'"
+                x-cloak
+                @submit.prevent="accountManager.deleteAccount()"
+            >
+                <p class="help-text">
+                    This permanently deletes your account, your profile and every saved ride. It can't be undone. Use
+                    "Export my data" first if you want a copy.
+                </p>
+                <label for="deletePassword">Your password</label>
+                <input
+                    class="input"
+                    id="deletePassword"
+                    type="password"
+                    autocomplete="current-password"
+                    maxlength="128"
+                    required
+                    data-autofocus
+                    x-model="ui.form.deletePassword"
+                />
+                <label class="check-row">
+                    <input type="checkbox" x-model="ui.form.deleteConfirm" /> I understand this can't be undone
+                </label>
+                <div class="dialog-actions">
+                    <button type="button" class="btn-outline" @click="accountManager.setView('menu')">Cancel</button>
+                    <button
+                        type="submit"
+                        class="btn-destructive"
+                        :disabled="ui.busy || !ui.form.deletePassword || !ui.form.deleteConfirm"
+                    >
+                        Delete account
+                    </button>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog id="hrConsentDialog" class="app-dialog" aria-labelledby="consent-title">
+            <form method="dialog">
+                <div class="dialog-heading">
+                    <div>
+                        <div class="eyebrow">YOUR HEART-RATE DATA</div>
+                        <h2 id="consent-title">Store it with your ride?</h2>
+                    </div>
+                </div>
+                <p class="help-text">
+                    Your heart-rate data will be stored in your account. You can delete it at any time.
+                </p>
+                <div class="dialog-actions">
+                    <button class="btn-outline" value="decline">Don't store it</button>
+                    <button class="btn" value="accept">Allow</button>
                 </div>
             </form>
         </dialog>
