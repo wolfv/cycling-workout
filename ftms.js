@@ -230,7 +230,10 @@ class FTMSController {
                     { namePrefix: 'BKOOL' },
                     // Wattbike
                     { namePrefix: 'WATTBIKE' },
-                    { namePrefix: 'Atom' }
+                    { namePrefix: 'Atom' },
+                    // Van Rysel trainers
+                    { namePrefix: 'VANRYSEL' }
+
                 ],
                 optionalServices: [
                     this.FITNESS_MACHINE_SERVICE,
